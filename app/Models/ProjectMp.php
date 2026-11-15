@@ -1,0 +1,95 @@
+<?php
+
+namespace App\Models;
+
+use App\Models\Concerns\BelongsToCabang;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
+class ProjectMp extends Model
+{
+    use HasFactory, BelongsToCabang;
+
+    public $table = 'project_mps';
+
+    protected $dates = [
+        'created_at',
+        'updated_at',
+    ];
+
+    protected $guarded = [];
+
+    public function marketplace()
+    {
+        return $this->belongsTo(Marketplace::class);
+    }
+
+    public function pemproses()
+    {
+        return $this->belongsTo(Pemproses::class, 'pemproses_id');
+    }
+
+    public function order()
+    {
+        // The project FK is authoritative; additional offline orders may be
+        // stored under a different cabang than the project itself.
+        return $this->belongsTo(Order::class, 'order_id')->withoutGlobalScope('cabang');
+    }
+
+    public function details()
+    {
+        return $this->hasMany(ProjectMpDetail::class, 'project_id');
+    }
+
+    public function buffer()
+    {
+        return $this->hasOne(MarketplaceBuffer::class, 'project_id')->latestOfMany();
+    }
+
+    public function chats()
+    {
+        return $this->hasMany(Chat::class, 'project_mp_id');
+    }
+
+    public function scopeOmzetTahun($query)
+    {
+        $query->select(
+            DB::raw('YEAR(created_at) as year'),
+            DB::raw('SUM(total) as sumMp')
+        );
+        $query->where('total', '>', 0);
+        $query->groupBy(DB::raw('YEAR(created_at)'));
+        $query->orderBy(DB::raw('YEAR(created_at)'));
+        return $query;
+    }
+
+    public function scopeOmzetBulan($query)
+    {
+        $query->select(
+            DB::raw('YEAR(created_at) as year'),
+            DB::raw('EXTRACT(YEAR_MONTH FROM created_at) as month'),
+            DB::raw('MONTHNAME(created_at) as monthname'),
+            DB::raw('SUM(total) as omzetMp')
+        );
+        $query->where('total', '>', 0);
+        $query->groupBy(
+            DB::raw('YEAR(created_at)'),
+            DB::raw('EXTRACT(YEAR_MONTH FROM created_at)'),
+            DB::raw('MONTHNAME(created_at)')
+        );
+        $query->orderBy(DB::raw('EXTRACT(YEAR_MONTH FROM created_at)'));
+        return $query;
+    }
+
+    public function getListprodukAttribute()
+    {
+        $yy = array();
+        foreach ($this->details as $item) {
+            $nama_produk = '';
+            $nama_produk .= $item->produk->namaLengkap ?? '-';
+            $yy[] = $nama_produk;
+        }
+        return implode(', ', $yy);
+    }
+}
