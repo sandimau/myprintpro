@@ -13,6 +13,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\File;
 use Intervention\Image\Facades\Image;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class ProdukModelController extends Controller
 {
@@ -33,9 +34,7 @@ class ProdukModelController extends Controller
 
     public function index()
     {
-        $currentUrl = request()->fullUrl();
-        $lastNumber = preg_replace('/[^0-9]/', '', substr($currentUrl, strrpos($currentUrl, '?') + 1));
-        $kategori = ProdukKategori::find($lastNumber);
+        $kategori = ProdukKategori::with('kategoriUtama')->findOrFail(request()->input('kategori_id'));
         $cabangs = Cabang::aktif()->orderBy('nama')->get();
 
         $produks = Produk::select(
@@ -68,7 +67,8 @@ class ProdukModelController extends Controller
             $cabangs->pluck('id')->map(fn ($id) => (int) $id)->all()
         );
 
-        return view('produkModel.index', compact('produks', 'kategori', 'cabangs', 'stokByProdukCabang'));
+        $satuan = $this->satuan;
+        return view('produkModel.index', compact('produks', 'kategori', 'cabangs', 'stokByProdukCabang', 'satuan'));
     }
 
     /**
@@ -140,7 +140,7 @@ class ProdukModelController extends Controller
 
     public function create()
     {
-        $kategori = ProdukKategori::find(request()->input('kategori_id'));
+        $kategori = ProdukKategori::findOrFail(request()->input('kategori_id'));
         $kontaks = Kontak::all();
         $satuan = $this->satuan;
         return view('produkModel.create', compact('kategori', 'kontaks', 'satuan'));
@@ -154,25 +154,24 @@ class ProdukModelController extends Controller
             'satuan' => 'required',
             'deskripsi' => 'nullable',
             'gambar' => 'nullable|image|mimes:jpeg,png,jpg',
+            'kategori_id' => 'required|exists:produk_kategoris,id',
         ]);
+
+        $kategori = ProdukKategori::with('kategoriUtama')->findOrFail($validated['kategori_id']);
 
         $gambar = null;
         if ($request->hasFile('gambar')) {
             $img = $request->file('gambar');
-            $filename = time() . '.' . $request->gambar->extension();
+            $filename = Str::uuid() . '.' . $img->extension();
             $img_resize = Image::make($img->getRealPath());
             $img_resize->resize(500, null, function ($constraint) {
                 $constraint->aspectRatio();
             });
-            $save_path = 'uploads/produk/';
-            if (!file_exists($save_path)) {
-                mkdir($save_path, 666, true);
-            }
-            $img_resize->save(public_path($save_path . $filename));
-            $gambar = $filename;
+            $save_path = storage_path('app/produk');
+            File::ensureDirectoryExists($save_path);
+            $img_resize->save($save_path . DIRECTORY_SEPARATOR . $filename);
+            $gambar = 'storage:' . $filename;
         }
-
-        $kategori = ProdukKategori::find($request->kategori_id);
 
         $validated['kategori_id'] = $request->kategori_id;
         $validated['jual'] = $kategori->kategoriUtama->jual;
@@ -181,13 +180,20 @@ class ProdukModelController extends Controller
         $validated['produksi'] = $kategori->kategoriUtama->produksi;
         $validated['gambar'] = $gambar;
 
-        $produkModel = ProdukModel::create($validated);
-
-        // Tambahkan data ke tabel produk
-        Produk::create([
-            'status' => 1,
-            'produk_model_id' => $produkModel->id
-        ]);
+        try {
+            DB::transaction(function () use ($validated) {
+                $produkModel = ProdukModel::create($validated);
+                Produk::create([
+                    'status' => 1,
+                    'produk_model_id' => $produkModel->id
+                ]);
+            });
+        } catch (\Throwable $exception) {
+            if ($gambar) {
+                File::delete(storage_path('app/produk/' . substr($gambar, strlen('storage:'))));
+            }
+            throw $exception;
+        }
         return redirect()->route('produkModel.index', ['kategori_id' => $kategori->id])->with('success', 'Produk berhasil ditambahkan');
     }
 
@@ -214,30 +220,35 @@ class ProdukModelController extends Controller
             'gambar' => 'nullable|image|mimes:jpeg,png,jpg',
         ]);
 
+        $kategori = ProdukKategori::with('kategoriUtama')->findOrFail($produkModel->kategori_id);
         $gambar = $produkModel->gambar;
+        $gambarBaru = null;
         if ($request->hasFile('gambar')) {
             $img = $request->file('gambar');
-            $filename = time() . '.' . $request->gambar->extension();
+            $filename = Str::uuid() . '.' . $img->extension();
             $img_resize = Image::make($img->getRealPath());
             $img_resize->resize(500, null, function ($constraint) {
                 $constraint->aspectRatio();
             });
-            $save_path = 'uploads/produk/';
-            if (!file_exists($save_path)) {
-                mkdir($save_path, 666, true);
-            }
-            $img_resize->save(public_path($save_path . $filename));
-            $gambar = $filename;
+            $save_path = storage_path('app/produk');
+            File::ensureDirectoryExists($save_path);
+            $img_resize->save($save_path . DIRECTORY_SEPARATOR . $filename);
+            $gambar = $gambarBaru = 'storage:' . $filename;
         }
 
-        $kategori = ProdukKategori::find($request->kategori_id);
-
-        $validated['kategori_id'] = $request->kategori_id;
+        $validated['kategori_id'] = $kategori->id;
         $validated['jual'] = $kategori->kategoriUtama->jual;
         $validated['beli'] = $kategori->kategoriUtama->beli;
         $validated['stok'] = $kategori->kategoriUtama->stok;
         $validated['gambar'] = $gambar;
-        $produkModel->update($validated);
+        try {
+            $produkModel->update($validated);
+        } catch (\Throwable $exception) {
+            if ($gambarBaru) {
+                File::delete(storage_path('app/produk/' . substr($gambarBaru, strlen('storage:'))));
+            }
+            throw $exception;
+        }
         return redirect()->route('produkModel.index', ['kategori_id' => $kategori->id])->with('success', 'Produk berhasil diperbarui');
     }
 
@@ -253,5 +264,14 @@ class ProdukModelController extends Controller
     public function show(ProdukModel $produkModel)
     {
         return view('produkModel.show', compact('produkModel'));
+    }
+
+    public function gambar(string $filename)
+    {
+        abort_unless(preg_match('/\A[a-f0-9-]{36}\.(?:png|jpe?g)\z/i', $filename), 404);
+        $path = storage_path('app/produk/' . $filename);
+        abort_unless(File::isFile($path), 404);
+
+        return response()->file($path);
     }
 }

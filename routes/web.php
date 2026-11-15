@@ -433,6 +433,7 @@ Route::group(['namespace' => 'App\Http\Controllers'], function()
             Route::resource('produk-kategori', 'ProdukKategoriController');
 
             // produk model
+            Route::get('produkModel/gambar/{filename}', 'ProdukModelController@gambar')->name('produkModel.gambar');
             Route::resource('produkModel', 'ProdukModelController');
 
             // produk
