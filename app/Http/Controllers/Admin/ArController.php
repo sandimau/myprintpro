@@ -25,16 +25,7 @@ class ArController extends Controller
     public function create()
     {
         abort_if(Gate::denies('ar_create'), Response::HTTP_FORBIDDEN, '403 Forbidden');
-        $ars = Ar::get();
-        $members = Member::get();
-        foreach ($ars as $ar) {
-            foreach ($members as $member) {
-                $data = [];
-                if ($member->id != $ar->member_id) {
-                    $data[$member->id] = $member->nama_lengkap;
-                }
-            }
-        }
+        $data = Member::whereDoesntHave('ar')->pluck('nama_lengkap', 'id');
 
         return view('admin.ars.create', compact('data'));
     }
