@@ -115,6 +115,7 @@ Route::group(['namespace' => 'App\Http\Controllers'], function()
             // akun details
             Route::resource('akunDetails', 'AkunDetailController');
             Route::get('/akunDetails/{akunDetail}/bukuBesar', 'AkunDetailController@bukubesar')->name('akundetail.bukubesar');
+            Route::post('/akunDetails/{akunDetail}/modalAwal', 'AkunDetailController@storeModalAwal')->middleware('can:akun_kategori_create')->name('akundetail.modalAwal.store');
             Route::get('/akunDetails/{akunDetail}/transfer', 'AkunDetailController@transfer')->name('akundetail.transfer');
             Route::post('/transfer/create', 'AkunDetailController@transferStore')->name('transfer.store');
             Route::get('/akunDetails/{akunDetail}/transferLain', 'AkunDetailController@transferLain')->name('akundetail.transferLain');
