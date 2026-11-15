@@ -214,12 +214,57 @@ class OrderProdukStockSearchTest extends TestCase
             collect($normalResult->json())->pluck('id')->all()
         );
 
-        $this->postJson('/admin/order', [
+        DB::table('produksis')->insert([
+            ['nama' => 'batal', 'grup' => 'batal'],
+            ['nama' => 'awal', 'grup' => 'awal'],
+        ]);
+        $this->post('/admin/order', [
             'kontak_id' => $kontak,
             'produk_id' => $tersedia,
             'harga' => 1000,
             'jumlah' => 1,
             'deathline' => date('Y-m-d'),
+            'nota' => 'ORDER-CABANG',
+        ])->assertRedirect();
+        $this->assertDatabaseHas('order_details', ['produk_id' => $tersedia, 'nota' => 'ORDER-CABANG']);
+    }
+
+    public function test_new_order_shows_and_saves_saleable_products_even_without_stock(): void
+    {
+        $cabang = DB::table('cabangs')->insertGetId(['nama' => 'Pusat', 'kode' => 'PUSAT', 'status' => 1]);
+        $this->withSession(['cabang_id' => $cabang]);
+        $kontak = DB::table('kontaks')->insertGetId(['cabang_id' => $cabang]);
+        $kategori = DB::table('produk_kategoris')->insertGetId(['nama' => 'Lanyard']);
+        $model = DB::table('produk_models')->insertGetId([
+            'kategori_id' => $kategori, 'nama' => 'Polos', 'harga' => 1000, 'jual' => 1,
+        ]);
+        $tanpaStok = DB::table('produks')->insertGetId(['produk_model_id' => $model, 'nama' => 'Merah', 'status' => 1]);
+        $nonaktif = DB::table('produks')->insertGetId(['produk_model_id' => $model, 'nama' => 'Biru', 'status' => 0]);
+        $bukanJual = DB::table('produk_models')->insertGetId([
+            'kategori_id' => $kategori, 'nama' => 'Bukan jual', 'harga' => 1000, 'jual' => 0,
+        ]);
+        $varianBukanJual = DB::table('produks')->insertGetId(['produk_model_id' => $bukanJual, 'nama' => 'Hijau', 'status' => 1]);
+
+        $autocomplete = file_get_contents(resource_path('views/admin/orders/create.blade.php'));
+        $this->assertStringContainsString('jual_saja=1', $autocomplete);
+        $this->assertStringNotContainsString('stok_tersedia=1', $autocomplete);
+
+        $result = $this->getJson('/admin/produk/api?q=Lanyard&jual_saja=1')->assertOk();
+        $this->assertEqualsCanonicalizing([$tanpaStok, $nonaktif], collect($result->json())->pluck('id')->all());
+
+        DB::table('produksis')->insert([
+            ['nama' => 'batal', 'grup' => 'batal'],
+            ['nama' => 'awal', 'grup' => 'awal'],
+        ]);
+        $this->post('/admin/order', [
+            'kontak_id' => $kontak, 'produk_id' => $tanpaStok, 'harga' => 1000,
+            'jumlah' => 1, 'deathline' => date('Y-m-d'), 'nota' => 'ORDER-TANPA-STOK',
+        ])->assertRedirect();
+        $this->assertDatabaseHas('order_details', ['produk_id' => $tanpaStok, 'nota' => 'ORDER-TANPA-STOK']);
+
+        $this->postJson('/admin/order', [
+            'kontak_id' => $kontak, 'produk_id' => $varianBukanJual, 'harga' => 1000,
+            'jumlah' => 1, 'deathline' => date('Y-m-d'),
         ])->assertUnprocessable()->assertJsonValidationErrors('produk_id');
     }
 
