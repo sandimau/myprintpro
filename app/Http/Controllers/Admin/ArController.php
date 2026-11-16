@@ -7,6 +7,7 @@ use App\Models\Ar;
 use App\Models\Member;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\File;
 use App\Http\Controllers\Controller;
 use Symfony\Component\HttpFoundation\Response;
 use Intervention\Image\Facades\Image;
@@ -47,11 +48,9 @@ class ArController extends Controller
             $img_resize->resize(500, null, function ($constraint) {
                 $constraint->aspectRatio();
             });
-            $save_path = 'uploads/ttd/';
-            if (!file_exists($save_path)) {
-                mkdir($save_path, 666, true);
-            }
-            $img_resize->save(public_path($save_path . $filename));
+            $save_path = public_path('uploads/ttd');
+            File::ensureDirectoryExists($save_path);
+            $img_resize->save($save_path . DIRECTORY_SEPARATOR . $filename);
             $gambar = $filename;
         }
 
@@ -93,16 +92,14 @@ class ArController extends Controller
             $img_resize->resize(500, null, function ($constraint) {
                 $constraint->aspectRatio();
             });
-            $save_path = 'uploads/ttd/';
-            if (!file_exists($save_path)) {
-                mkdir($save_path, 666, true);
-            }
-            $img_resize->save(public_path($save_path . $filename));
+            $save_path = public_path('uploads/ttd');
+            File::ensureDirectoryExists($save_path);
+            $img_resize->save($save_path . DIRECTORY_SEPARATOR . $filename);
             $gambar = $filename;
         }
 
         if ($ar->ttd) {
-            unlink("uploads/ttd/".$ar->ttd);
+            File::delete(public_path('uploads/ttd/' . $ar->ttd));
         }
 
         $ar->update([
