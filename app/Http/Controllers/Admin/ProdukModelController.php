@@ -35,7 +35,8 @@ class ProdukModelController extends Controller
     public function index()
     {
         $kategori = ProdukKategori::with('kategoriUtama')->findOrFail(request()->input('kategori_id'));
-        $cabangs = Cabang::aktif()->orderBy('nama')->get();
+        $tampilkanStok = ! $kategori->kategoriUtama->is_custom;
+        $cabangs = $tampilkanStok ? Cabang::aktif()->orderBy('nama')->get() : collect();
 
         $produks = Produk::select(
             'produks.id as produk_id',
@@ -62,13 +63,13 @@ class ProdukModelController extends Controller
             ->where('produk_models.kategori_id', $kategori->id)
             ->get();
 
-        $stokByProdukCabang = $this->loadStokSemuaCabang(
+        $stokByProdukCabang = $tampilkanStok ? $this->loadStokSemuaCabang(
             $produks->pluck('produk_id')->map(fn ($id) => (int) $id)->all(),
             $cabangs->pluck('id')->map(fn ($id) => (int) $id)->all()
-        );
+        ) : [];
 
         $satuan = $this->satuan;
-        return view('produkModel.index', compact('produks', 'kategori', 'cabangs', 'stokByProdukCabang', 'satuan'));
+        return view('produkModel.index', compact('produks', 'kategori', 'cabangs', 'stokByProdukCabang', 'satuan', 'tampilkanStok'));
     }
 
     /**

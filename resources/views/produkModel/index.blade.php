@@ -26,19 +26,27 @@
                     <thead>
                         <tr>
                             <th>SKU</th>
+                            @if ($kategori->kategoriUtama->is_custom)<th>Resep / SKU Shopee</th>@endif
                             <th>Gambar</th>
                             <th>Nama</th>
                             <th>varian</th>
                             <th>Satuan</th>
-                            <th>harga beli</th>
+                            @unless ($kategori->kategoriUtama->is_custom)
+                                <th>harga beli</th>
+                            @endunless
                             <th>harga jual</th>
                             <th>hpp</th>
-                            @foreach ($cabangs as $cabang)
-                                <th class="text-center text-nowrap">
-                                    Stok {{ $cabang->kode ?: $cabang->nama }}
-                                </th>
-                            @endforeach
-                            <th class="text-center">Total</th>
+                            @if ($kategori->kategoriUtama->is_custom)
+                                <th>Margin</th>
+                            @endif
+                            @if ($tampilkanStok)
+                                @foreach ($cabangs as $cabang)
+                                    <th class="text-center text-nowrap">
+                                        Stok {{ $cabang->kode ?: $cabang->nama }}
+                                    </th>
+                                @endforeach
+                                <th class="text-center">Total</th>
+                            @endif
                             @role('super')
                                 <th>action</th>
                             @endrole
@@ -52,11 +60,14 @@
                             @php
                                 $showModel = $prevModel !== $produk->model;
                                 $prevModel = $produk->model;
-                                $stokCabang = $stokByProdukCabang[$produk->produk_id] ?? [];
-                                $totalStok = array_sum($stokCabang);
+                                $stokCabang = $tampilkanStok ? ($stokByProdukCabang[$produk->produk_id] ?? []) : [];
+                                $totalStok = $tampilkanStok ? array_sum($stokCabang) : 0;
                             @endphp
                             <tr>
                                 <td>{{ $produk->produk_id }}</td>
+                                @if ($kategori->kategoriUtama->is_custom)
+                                    <td><a href="{{ route('produkCustom.resep', $produk->produk_id) }}" data-produk-popup="Atur Resep">Atur resep &amp; salin SKU</a></td>
+                                @endif
                                 <td>
                                     @if ($produk->gambar)
                                         @if ($showModel)
@@ -77,24 +88,47 @@
                                 </td>
                                 <td>{{ $produk->varian }}</td>
                                 <td>{{ $produk->satuan }}</td>
-                                <td>Rp {{ number_format($produk->harga_beli, 0, ',', '.') }}</td>
+                                @unless ($kategori->kategoriUtama->is_custom)
+                                    <td>Rp {{ number_format($produk->harga_beli, 0, ',', '.') }}</td>
+                                @endunless
                                 <td>Rp {{ number_format($produk->harga, 0, ',', '.') }}</td>
-                                <td><a href="{{ route('produk.belanja', ['produk' => $produk->produk_id]) }}" data-produk-popup="Riwayat Belanja">Rp
-                                        {{ number_format($produk->hpp, 0, ',', '.') }}</a></td>
-                                @foreach ($cabangs as $cabang)
-                                    @php
-                                        $saldo = (int) ($stokCabang[$cabang->id] ?? 0);
-                                    @endphp
-                                    <td class="text-center {{ $saldo < 0 ? 'text-danger' : '' }}">
-                                        <a href="{{ route('produk.stok', ['produk' => $produk->produk_id]) }}" data-produk-popup="Riwayat Stok"
-                                            title="Stok {{ $cabang->nama }}">
-                                            {{ $saldo }}
-                                        </a>
-                                    </td>
-                                @endforeach
-                                <td class="text-center fw-semibold {{ $totalStok < 0 ? 'text-danger' : '' }}">
-                                    {{ $totalStok }}
+                                <td>
+                                    @if ($kategori->kategoriUtama->is_custom)
+                                        <a href="{{ route('produkCustom.resep', $produk->produk_id) }}" data-produk-popup="Atur Resep">Rp {{ number_format($produk->hpp, 0, ',', '.') }}</a>
+                                    @else
+                                        <a href="{{ route('produk.belanja', ['produk' => $produk->produk_id]) }}" data-produk-popup="Riwayat Belanja">Rp {{ number_format($produk->hpp, 0, ',', '.') }}</a>
+                                    @endif
                                 </td>
+                                @if ($kategori->kategoriUtama->is_custom)
+                                    @php
+                                        $hargaJual = (float) $produk->harga;
+                                        $margin = $hargaJual - (float) $produk->hpp;
+                                    @endphp
+                                    <td class="{{ $hargaJual > 0 && $margin < 0 ? 'text-danger' : '' }}">
+                                        @if ($hargaJual > 0)
+                                            Rp {{ number_format($margin, 0, ',', '.') }}
+                                            <small>({{ number_format($margin / $hargaJual * 100, 1, ',', '.') }}%)</small>
+                                        @else
+                                            —
+                                        @endif
+                                    </td>
+                                @endif
+                                @if ($tampilkanStok)
+                                    @foreach ($cabangs as $cabang)
+                                        @php
+                                            $saldo = (int) ($stokCabang[$cabang->id] ?? 0);
+                                        @endphp
+                                        <td class="text-center {{ $saldo < 0 ? 'text-danger' : '' }}">
+                                            <a href="{{ route('produk.stok', ['produk' => $produk->produk_id]) }}" data-produk-popup="Riwayat Stok"
+                                                title="Stok {{ $cabang->nama }}">
+                                                {{ $saldo }}
+                                            </a>
+                                        </td>
+                                    @endforeach
+                                    <td class="text-center fw-semibold {{ $totalStok < 0 ? 'text-danger' : '' }}">
+                                        {{ $totalStok }}
+                                    </td>
+                                @endif
                                 @role('super')
                                     <td>
                                         <form
@@ -147,6 +181,7 @@
 @endsection
 
 @push('after-styles')
+    <link rel="stylesheet" href="{{ asset('js/autocomplete.css') }}">
     <style>
         @media (min-width: 992px) {
             #produkLinkModal .modal-dialog.modal-xxl {
@@ -166,6 +201,8 @@
 @endpush
 
 @push('after-scripts')
+    <script src="{{ asset('js/autocomplete.min.js') }}"></script>
+    <script src="{{ asset('js/produk-custom-resep.js') }}"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const tambahModal = new bootstrap.Modal(document.getElementById('tambahProdukModal'));
@@ -265,6 +302,7 @@
                     if (!content) throw new Error('Konten tidak ditemukan');
                     body.replaceChildren(...Array.from(content.children));
                     body.scrollTop = 0;
+                    window.initProdukCustomResep(body);
                 } catch (error) {
                     if (!signal.aborted) {
                         openLink.href = fallbackUrl;
@@ -305,6 +343,7 @@
             body.addEventListener('submit', function (event) {
                 const form = event.target;
                 if (!(form instanceof HTMLFormElement)) return;
+                if (event.defaultPrevented) return;
                 event.preventDefault();
                 const url = new URL(form.action || currentUrl);
                 const data = new FormData(form, event.submitter);

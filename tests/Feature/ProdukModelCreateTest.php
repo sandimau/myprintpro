@@ -32,6 +32,7 @@ class ProdukModelCreateTest extends TestCase
             $table->boolean('beli');
             $table->boolean('stok');
             $table->boolean('produksi');
+            $table->boolean('is_custom')->default(false);
         });
         Schema::create('produk_kategoris', function (Blueprint $table) {
             $table->id();
@@ -77,6 +78,29 @@ class ProdukModelCreateTest extends TestCase
 
         DB::table('produk_kategori_utamas')->insert(['id' => 1, 'nama' => 'Utama', 'jual' => 1, 'beli' => 0, 'stok' => 1, 'produksi' => 0]);
         DB::table('produk_kategoris')->insert(['id' => 130, 'kategori_utama_id' => 1, 'nama' => 'Kategori']);
+    }
+
+    public function test_daftar_produk_custom_tidak_menampilkan_kolom_stok_cabang(): void
+    {
+        DB::table('produk_kategori_utamas')->insert(['id' => 17, 'nama' => 'CETAK CUSTOM OFLINE', 'jual' => 1,
+            'beli' => 0, 'stok' => 0, 'produksi' => 0, 'is_custom' => 1]);
+        DB::table('produk_kategoris')->insert(['id' => 137, 'kategori_utama_id' => 17, 'nama' => 'ID Card']);
+        DB::table('cabangs')->insert(['id' => 1, 'nama' => 'Pusat', 'status' => 1]);
+
+        $this->app->instance('request', Request::create('/admin/produkModel', 'GET', ['kategori_id' => 137]));
+        $custom = app(ProdukModelController::class)->index()->getData();
+        $this->assertFalse($custom['tampilkanStok']);
+        $this->assertCount(0, $custom['cabangs']);
+        $this->assertSame([], $custom['stokByProdukCabang']);
+        $table = File::get(resource_path('views/produkModel/index.blade.php'));
+        $this->assertStringContainsString('@unless ($kategori->kategoriUtama->is_custom)', $table);
+        $this->assertStringContainsString('<th>Margin</th>', $table);
+        $this->assertStringContainsString('$margin = $hargaJual - (float) $produk->hpp;', $table);
+
+        $this->app->instance('request', Request::create('/admin/produkModel', 'GET', ['kategori_id' => 130]));
+        $biasa = app(ProdukModelController::class)->index()->getData();
+        $this->assertTrue($biasa['tampilkanStok']);
+        $this->assertCount(1, $biasa['cabangs']);
     }
 
     public function test_form_tambah_tersedia_langsung_di_modal_dan_simpan_membuat_sku(): void

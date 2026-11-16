@@ -18,7 +18,7 @@
 
         <div class="mb-3">
             <h3 class="mb-1">Ambil Barang</h3>
-            <p class="text-muted mb-0">Kebutuhan produk jadi per cabang dan order.</p>
+            <p class="text-muted mb-0">Kebutuhan produk stok dan bahan resep custom per cabang dan order.</p>
         </div>
 
         <ul class="nav nav-tabs mb-3" aria-label="Daftar pengambilan barang">

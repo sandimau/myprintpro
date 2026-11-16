@@ -459,21 +459,19 @@ class BufferController extends Controller
                                     $sku = $item['item_sku'];
 
                                 if ($sku != 'NON_PRODUK') {
-                                    if (strpos($sku, 'CUSTOM_') !== false) {
-                                        $custom = 1;
-                                        $sku = str_replace('CUSTOM_', "", $sku);
-                                    }
+                                    if (str_starts_with((string) $sku, 'CUSTOM_')) $custom = 1;
+                                    $parsed = app(\App\Services\ProdukCustomService::class)->parseSku((string) $sku);
+                                    $materialIds = $parsed['material_ids'];
+                                    $sku = $parsed['produk_id'];
+                                    $paket = $parsed['paket'];
+                                    if (app(\App\Services\ProdukCustomService::class)->isCustom($sku)) $custom = 1;
 
                                     $jumlah = $item['model_quantity_purchased'];
                                     $harga = $item['model_discounted_price'];
 
                                     $hargaTotal += $harga * $jumlah;
 
-                                    $paket = 1;
-                                    if (strpos($sku, '_') !== false) {
-                                        $skuParts = explode('_', $sku);
-                                        $sku = $skuParts[0];
-                                        $paket = $skuParts[1];
+                                    if ($paket > 1) {
                                         $jumlah = $jumlah * $paket;
                                         $harga = floor($harga / $paket);
                                     }
@@ -513,6 +511,7 @@ class BufferController extends Controller
                                         'harga' => $harga,
                                         'jumlah' => $jumlah,
                                         'produk_id' => $sku,
+                                        'material_ids' => json_encode($materialIds),
                                         'nota' => $nota,
                                         'tema' => $item['model_name'],
                                         'project_id' => $project_id,
@@ -524,6 +523,9 @@ class BufferController extends Controller
 
                             if (!empty($orderdetail)) {
                                 ProjectMpDetail::insert($orderdetail);
+                                foreach (ProjectMpDetail::where('project_id', $project_id)->pluck('id') as $detailId) {
+                                    app(\App\Services\ProdukCustomService::class)->snapshot('project', $detailId);
+                                }
                                 ProjectMp::where('id', $project_id)->update(['total' => $hargaTotal]);
                             }
 

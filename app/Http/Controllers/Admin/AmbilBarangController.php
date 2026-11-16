@@ -64,7 +64,7 @@ class AmbilBarangController extends Controller
         $this->authorizeStok();
         $data = $request->validate([
             'items' => 'required|array|min:1',
-            'items.*' => ['required', 'string', 'regex:/^(order|project):[1-9][0-9]*$/'],
+            'items.*' => ['required', 'string', 'regex:/^(order|project)(-bahan)?:[1-9][0-9]*$/'],
         ]);
 
         $jumlah = $service->ambil($data['items']);

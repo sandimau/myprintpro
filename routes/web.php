@@ -332,6 +332,10 @@ Route::group(['namespace' => 'App\Http\Controllers'], function()
             Route::get('/kontak/api', 'OrderController@apiKontak')->name('order.kontak');
             Route::get('/supplier/api', 'OrderController@apiSupplier')->name('order.supplier');
             Route::get('/produk/api', 'OrderController@apiProduk')->name('order.produk');
+            Route::get('/produk/{produk}/resep', 'ProdukCustomResepController@index')->name('produkCustom.resep');
+            Route::get('/produk/{produk}/resep/komponen', 'ProdukCustomResepController@apiKomponen')->name('produkCustom.resep.komponen');
+            Route::post('/produk/{produk}/resep', 'ProdukCustomResepController@store')->name('produkCustom.resep.store');
+            Route::delete('/produk/{produk}/resep/{resep}', 'ProdukCustomResepController@destroy')->name('produkCustom.resep.destroy');
             Route::get('/produkBeli/api', 'OrderController@apiProdukBeli')->name('order.produkBeli');
             Route::get('/produkProduksi/api', 'OrderController@apiProdukProduksi')->name('order.produkProduksi');
             Route::get('/produksi/api', 'OrderController@apiProduksi')->name('order.produksi');
