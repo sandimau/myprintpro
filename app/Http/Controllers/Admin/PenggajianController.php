@@ -85,8 +85,8 @@ class PenggajianController extends Controller
         // Cuti = aman. Sakit/ijin/terlambat/alpha = mengurangi
         // 1x tidak masuk = 50%, 2x+ = hangus. Hanya untuk jenis karyawan.
         [$periodeMulai, $periodeSelesai] = $member->periodeGajian();
-        // levels.kehadiran yang masih 0/null dianggap belum diisi, pakai nominal default
-        $tunjanganKehadiranPenuh = (int) ($level->kehadiran ?: 100000);
+        // Hanya null yang belum diisi; nilai 0 berarti tunjangan dinonaktifkan.
+        $tunjanganKehadiranPenuh = (int) ($level->kehadiran ?? 100000);
         $jumlahAbsenTidakCuti = 0;
         $tunjanganKehadiran = 0;
 
