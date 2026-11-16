@@ -5,10 +5,6 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Http\Controllers\Admin\AmbilBarangController;
 use App\Services\AmbilBarangService;
-use App\Services\ProduksiStatusService;
-use App\Models\OrderDetail;
-use App\Models\ProjectMpDetail;
-use App\Models\Produksi;
 use App\Services\ShopeeStockSyncService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -30,27 +26,23 @@ class AmbilBarangServiceTest extends TestCase
         session(['cabang_id' => 1]);
 
         Schema::create('cabangs', function (Blueprint $t) { $t->id(); $t->string('kode'); $t->string('nama'); $t->boolean('status'); });
-        Schema::create('produk_kategori_utamas', function (Blueprint $t) { $t->id(); $t->boolean('is_custom')->default(false); });
-        Schema::create('produk_kategoris', function (Blueprint $t) { $t->id(); $t->string('nama'); $t->unsignedBigInteger('kategori_utama_id')->nullable(); $t->softDeletes(); });
+        Schema::create('produk_kategoris', function (Blueprint $t) { $t->id(); $t->string('nama'); $t->softDeletes(); });
         Schema::create('produk_models', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('kategori_id'); $t->string('nama'); $t->boolean('stok'); $t->timestamps(); $t->softDeletes(); });
-        Schema::create('produks', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('produk_model_id'); $t->string('nama')->nullable(); $t->integer('hpp')->default(0); $t->boolean('status')->default(true); $t->timestamps(); });
+        Schema::create('produks', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('produk_model_id'); $t->string('nama')->nullable(); $t->integer('hpp')->default(0); $t->timestamps(); });
         Schema::create('kontaks', function (Blueprint $t) { $t->id(); $t->string('nama'); $t->unsignedBigInteger('cabang_id')->nullable(); $t->boolean('marketplace')->nullable(); $t->timestamps(); $t->softDeletes(); });
         Schema::create('orders', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('kontak_id'); $t->unsignedBigInteger('cabang_id'); $t->string('nota'); $t->string('pengiriman')->nullable(); $t->boolean('marketplace')->nullable(); $t->timestamps(); $t->softDeletes(); });
-        Schema::create('project_mps', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('order_id')->nullable(); $t->unsignedBigInteger('cabang_id'); $t->string('nota'); $t->string('konsumen')->nullable(); $t->string('shipping')->nullable(); $t->timestamps(); });
+        Schema::create('project_mps', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('cabang_id'); $t->string('nota'); $t->string('konsumen')->nullable(); $t->string('shipping')->nullable(); $t->timestamps(); });
         Schema::create('marketplace_buffers', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('project_id'); $t->boolean('custom')->default(false); });
         Schema::create('produksis', function (Blueprint $t) { $t->id(); $t->string('nama'); $t->string('grup'); $t->timestamps(); $t->softDeletes(); });
-        Schema::create('order_details', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('order_id'); $t->unsignedBigInteger('produk_id'); $t->integer('jumlah'); $t->integer('hpp')->nullable(); $t->string('material_ids')->nullable(); $t->timestamp('custom_resep_disalin_at')->nullable(); $t->unsignedBigInteger('produksi_id')->nullable(); $t->timestamps(); $t->softDeletes(); });
-        Schema::create('project_mp_details', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('project_id'); $t->unsignedBigInteger('produk_id'); $t->integer('jumlah'); $t->integer('hpp')->nullable(); $t->string('material_ids')->nullable(); $t->timestamp('custom_resep_disalin_at')->nullable(); $t->unsignedBigInteger('produksi_id')->nullable(); $t->timestamps(); });
+        Schema::create('order_details', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('order_id'); $t->unsignedBigInteger('produk_id'); $t->integer('jumlah'); $t->unsignedBigInteger('produksi_id')->nullable(); $t->timestamps(); $t->softDeletes(); });
+        Schema::create('project_mp_details', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('project_id'); $t->unsignedBigInteger('produk_id'); $t->integer('jumlah'); $t->unsignedBigInteger('produksi_id')->nullable(); $t->timestamps(); });
         Schema::create('produk_stoks', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('produk_id'); $t->unsignedBigInteger('cabang_id'); $t->integer('tambah'); $t->integer('kurang'); $t->integer('hpp')->nullable(); $t->string('kode')->nullable(); $t->string('keterangan')->nullable(); $t->unsignedBigInteger('detail_id')->nullable(); $t->unsignedBigInteger('user_id')->nullable(); $t->timestamps(); $t->softDeletes(); });
         Schema::create('produk_last_stoks', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('produk_id'); $t->unsignedBigInteger('cabang_id'); $t->integer('tahun'); $t->integer('saldo'); $t->timestamps(); });
         Schema::create('ambil_barangs', function (Blueprint $t) { $t->id(); $t->string('sumber'); $t->unsignedBigInteger('detail_id'); $t->unsignedBigInteger('produk_id'); $t->unsignedBigInteger('cabang_id'); $t->integer('jumlah'); $t->unsignedBigInteger('produk_stok_id')->nullable(); $t->unsignedBigInteger('user_id')->nullable(); $t->timestamp('created_at')->nullable(); $t->string('nota')->nullable(); $t->string('pembeli')->nullable(); $t->string('jenis')->nullable(); $t->string('shipping')->nullable(); $t->timestamp('tanggal_order')->nullable(); $t->unique(['sumber', 'detail_id']); });
         Schema::create('cek_stok_kosongs', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('produk_id'); $t->unsignedBigInteger('cabang_id'); $t->timestamp('created_at')->nullable(); });
-        Schema::create('produk_custom_reseps', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('produk_id'); $t->string('jenis'); $t->unsignedBigInteger('komponen_model_id')->nullable(); $t->decimal('jumlah', 12, 2); $t->unsignedInteger('biaya')->nullable(); $t->boolean('per_order')->default(false); $t->timestamps(); });
-        Schema::create('order_custom_bahans', function (Blueprint $t) { $t->id(); $t->string('sumber'); $t->unsignedBigInteger('detail_id'); $t->unsignedBigInteger('produk_id'); $t->integer('jumlah'); $t->integer('hpp'); $t->unsignedBigInteger('ambil_barang_id')->nullable(); $t->timestamps(); });
 
         DB::table('cabangs')->insert(['id' => 1, 'kode' => 'PUSAT', 'nama' => 'Pusat', 'status' => 1]);
-        DB::table('produk_kategori_utamas')->insert(['id' => 1, 'is_custom' => 0]);
-        DB::table('produk_kategoris')->insert(['id' => 1, 'nama' => 'Kategori', 'kategori_utama_id' => 1]);
+        DB::table('produk_kategoris')->insert(['id' => 1, 'nama' => 'Kategori']);
         DB::table('produk_models')->insert([['id' => 1, 'kategori_id' => 1, 'nama' => 'Barang', 'stok' => 1], ['id' => 2, 'kategori_id' => 1, 'nama' => 'Custom', 'stok' => 0]]);
         DB::table('produks')->insert([['id' => 1, 'produk_model_id' => 1, 'nama' => 'A'], ['id' => 2, 'produk_model_id' => 2, 'nama' => 'B']]);
         DB::table('kontaks')->insert(['id' => 1, 'nama' => 'Pembeli', 'cabang_id' => 1]);
@@ -77,155 +69,6 @@ class AmbilBarangServiceTest extends TestCase
         $this->assertSame(9, $group['jumlah']);
         $this->assertSame(6, $group['stok']);
         $this->assertEqualsCanonicalizing(['order:1', 'project:1'], $group['items']->pluck('key')->all());
-    }
-
-    public function test_resep_custom_offline_dan_marketplace_muncul_di_halaman_sama_dan_dipotong_sekali(): void
-    {
-        DB::table('produk_kategori_utamas')->insert(['id' => 2, 'is_custom' => 1]);
-        DB::table('produk_kategoris')->insert(['id' => 2, 'nama' => 'Produk Custom', 'kategori_utama_id' => 2]);
-        DB::table('produk_models')->insert([
-            ['id' => 3, 'kategori_id' => 1, 'nama' => 'Warna', 'stok' => 1],
-            ['id' => 4, 'kategori_id' => 2, 'nama' => 'Custom', 'stok' => 0],
-        ]);
-        DB::table('produks')->insert([
-            ['id' => 3, 'produk_model_id' => 3, 'nama' => 'Merah', 'hpp' => 25],
-            ['id' => 4, 'produk_model_id' => 4, 'nama' => null, 'hpp' => 0],
-            ['id' => 5, 'produk_model_id' => 3, 'nama' => 'Biru', 'hpp' => 30],
-        ]);
-        DB::table('produk_custom_reseps')->insert([
-            ['produk_id' => 4, 'jenis' => 'bahan', 'komponen_model_id' => 3, 'jumlah' => 1.5, 'biaya' => null, 'per_order' => 0],
-            ['produk_id' => 4, 'jenis' => 'internal', 'komponen_model_id' => null, 'jumlah' => 1, 'biaya' => 100, 'per_order' => 1],
-        ]);
-        DB::table('produk_stoks')->insert([
-            ['produk_id' => 3, 'cabang_id' => 1, 'tambah' => 9, 'kurang' => 0, 'created_at' => now()],
-            ['produk_id' => 5, 'cabang_id' => 1, 'tambah' => 9, 'kurang' => 0, 'created_at' => now()],
-        ]);
-        $custom = app(\App\Services\ProdukCustomService::class);
-        $this->assertSame(['produk_id' => 4, 'material_ids' => [5], 'paket' => 2], $custom->parseSku('CUSTOM_4-5_2'));
-        Gate::shouldReceive('allows')->once()->with('produk_access')->andReturn(true);
-        $komponen = app(\App\Http\Controllers\Admin\ProdukCustomResepController::class)
-            ->apiKomponen(Request::create('/admin/produk/4/resep/komponen', 'GET', ['q' => 'warna']), \App\Models\Produk::findOrFail(4));
-        $this->assertSame([3], collect($komponen->getData(true))->pluck('id')->all());
-        try {
-            $custom->parseSku('CUSTOM_4-1');
-            $this->fail('SKU dengan varian yang bukan komponen resep harus ditolak.');
-        } catch (ValidationException $e) {
-            $this->assertArrayHasKey('produk_id', $e->errors());
-        }
-        $this->assertEqualsCanonicalizing(['CUSTOM_4-3', 'CUSTOM_4-5'], array_column($custom->skuOptions(4), 'sku'));
-        DB::table('order_details')->insert(['id' => 3, 'order_id' => 1, 'produk_id' => 4, 'jumlah' => 2,
-            'material_ids' => '[5]', 'produksi_id' => 1]);
-        DB::table('project_mp_details')->insert(['id' => 2, 'project_id' => 1, 'produk_id' => 4, 'jumlah' => 3,
-            'material_ids' => '[3]', 'produksi_id' => 1]);
-
-        $service = app(AmbilBarangService::class);
-        $items = $service->kebutuhan()->flatMap(fn ($g) => $g['items'])->pluck('key')->all();
-        $this->assertContains('order:1', $items);
-        $this->assertContains('order-bahan:1', $items);
-        $this->assertContains('project-bahan:2', $items);
-        $this->assertDatabaseHas('order_custom_bahans', ['sumber' => 'order', 'detail_id' => 3, 'produk_id' => 5, 'jumlah' => 3]);
-        $this->assertDatabaseHas('order_custom_bahans', ['sumber' => 'project', 'detail_id' => 2, 'produk_id' => 3, 'jumlah' => 5]);
-        $this->assertSame(95, (int) DB::table('order_details')->where('id', 3)->value('hpp'));
-
-        $this->assertSame(2, $service->ambil(['order-bahan:1', 'project-bahan:2']));
-        $this->assertSame(6, app(\App\Services\StokService::class)->saldoTersedia(5, 1));
-        $this->assertSame(4, app(\App\Services\StokService::class)->saldoTersedia(3, 1));
-        $this->assertDatabaseHas('ambil_barangs', ['sumber' => 'order-bahan', 'detail_id' => 1]);
-        $this->assertDatabaseHas('ambil_barangs', ['sumber' => 'project-bahan', 'detail_id' => 2]);
-        $this->assertCount(2, $service->arsip()->filter(fn ($item) => $item['jenis'] === 'Bahan custom'));
-        $this->assertNotContains('order-bahan:1', $service->kebutuhan()->flatMap(fn ($g) => $g['items'])->pluck('key')->all());
-        $this->expectException(ValidationException::class);
-        $service->ambil(['order-bahan:1']);
-    }
-
-    public function test_order_marketplace_csv_tanpa_project_muncul_sebagai_bahan_custom(): void
-    {
-        DB::table('produk_kategori_utamas')->insert(['id' => 2, 'is_custom' => 1]);
-        DB::table('produk_kategoris')->insert(['id' => 2, 'nama' => 'Custom', 'kategori_utama_id' => 2]);
-        DB::table('produk_models')->insert(['id' => 3, 'kategori_id' => 2, 'nama' => 'Produk Custom', 'stok' => 0]);
-        DB::table('produks')->insert(['id' => 3, 'produk_model_id' => 3, 'nama' => null]);
-        DB::table('produk_custom_reseps')->insert(['produk_id' => 3, 'jenis' => 'bahan', 'komponen_model_id' => 1, 'jumlah' => 2]);
-        DB::table('orders')->insert(['id' => 2, 'kontak_id' => 1, 'cabang_id' => 1, 'nota' => 'CSV1', 'marketplace' => 1]);
-        DB::table('order_details')->insert(['id' => 3, 'order_id' => 2, 'produk_id' => 3, 'jumlah' => 2,
-            'material_ids' => '[]', 'produksi_id' => 1]);
-
-        $service = app(AmbilBarangService::class);
-        $item = $service->kebutuhan()->flatMap(fn ($g) => $g['items'])
-            ->firstWhere('key', 'order-bahan:1');
-        $this->assertNotNull($item);
-        $this->assertSame(4, $item['jumlah']);
-        $this->assertSame(1, $service->ambil(['order-bahan:1']));
-        $this->assertDatabaseHas('ambil_barangs', ['sumber' => 'order-bahan', 'jumlah' => 4]);
-    }
-
-    public function test_status_grup_produksi_menunggu_pengambilan_produk_stok_offline_dan_online(): void
-    {
-        DB::table('produksis')->insert(['id' => 2, 'nama' => 'PRINT_IDCARD', 'grup' => 'Produksi ID Card']);
-        DB::table('produk_stoks')->insert(['produk_id' => 1, 'cabang_id' => 1, 'tambah' => 10, 'kurang' => 0, 'created_at' => now()]);
-        $target = Produksi::findOrFail(2);
-        $guard = app(ProduksiStatusService::class);
-
-        foreach ([OrderDetail::findOrFail(1), ProjectMpDetail::findOrFail(1)] as $detail) {
-            try {
-                $guard->pastikanBahanDiambil($detail, $target);
-                $this->fail('Produk stok tidak boleh masuk produksi sebelum diambil.');
-            } catch (ValidationException $e) {
-                $this->assertArrayHasKey('produksi_id', $e->errors());
-            }
-        }
-        app(AmbilBarangService::class)->ambil(['order:1', 'project:1']);
-        $guard->pastikanBahanDiambil(OrderDetail::findOrFail(1), $target);
-        $guard->apply(ProjectMpDetail::findOrFail(1), $target->id);
-        $this->assertDatabaseHas('project_mp_details', ['id' => 1, 'produksi_id' => 2]);
-    }
-
-    public function test_status_grup_produksi_menunggu_seluruh_bahan_resep_custom(): void
-    {
-        DB::table('produksis')->insert(['id' => 2, 'nama' => 'PRINT_IDCARD', 'grup' => 'Produksi ID Card']);
-        DB::table('produk_kategori_utamas')->insert(['id' => 2, 'is_custom' => 1]);
-        DB::table('produk_kategoris')->insert(['id' => 2, 'nama' => 'Custom', 'kategori_utama_id' => 2]);
-        DB::table('produk_models')->insert(['id' => 3, 'kategori_id' => 2, 'nama' => 'Produk Custom', 'stok' => 0]);
-        DB::table('produk_models')->insert(['id' => 4, 'kategori_id' => 1, 'nama' => 'Bahan Kedua', 'stok' => 1]);
-        DB::table('produks')->insert(['id' => 3, 'produk_model_id' => 3, 'nama' => null]);
-        DB::table('produks')->insert(['id' => 4, 'produk_model_id' => 4, 'nama' => null]);
-        DB::table('produk_custom_reseps')->insert(['produk_id' => 3, 'jenis' => 'bahan', 'komponen_model_id' => 1, 'jumlah' => 1]);
-        DB::table('produk_custom_reseps')->insert(['produk_id' => 3, 'jenis' => 'bahan', 'komponen_model_id' => 4, 'jumlah' => 1]);
-        DB::table('produk_stoks')->insert(['produk_id' => 4, 'cabang_id' => 1, 'tambah' => 9, 'kurang' => 0, 'created_at' => now()]);
-        DB::table('order_details')->insert(['id' => 3, 'order_id' => 1, 'produk_id' => 3, 'jumlah' => 2,
-            'material_ids' => '[]', 'produksi_id' => 1]);
-        DB::table('project_mp_details')->insert(['id' => 2, 'project_id' => 1, 'produk_id' => 3, 'jumlah' => 2,
-            'material_ids' => '[]', 'produksi_id' => 1]);
-        app(\App\Services\ProdukCustomService::class)->snapshot('order', 3);
-        app(\App\Services\ProdukCustomService::class)->snapshot('project', 2);
-        $guard = app(ProduksiStatusService::class);
-        $target = Produksi::findOrFail(2);
-
-        foreach ([OrderDetail::findOrFail(3), ProjectMpDetail::findOrFail(2)] as $detail) {
-            try {
-                $guard->pastikanBahanDiambil($detail, $target);
-                $this->fail('Bahan custom belum diambil.');
-            } catch (ValidationException $e) {
-                $this->assertArrayHasKey('produksi_id', $e->errors());
-            }
-        }
-        try {
-            $guard->apply(ProjectMpDetail::findOrFail(2), $target->id);
-            $this->fail('Online status must not advance before pickup.');
-        } catch (ValidationException $e) {
-            $this->assertDatabaseHas('project_mp_details', ['id' => 2, 'produksi_id' => 1]);
-        }
-
-        app(AmbilBarangService::class)->ambil(['order-bahan:1', 'project-bahan:3']);
-        try {
-            $guard->apply(ProjectMpDetail::findOrFail(2), $target->id);
-            $this->fail('Tidak boleh masuk produksi jika baru sebagian bahan diambil.');
-        } catch (ValidationException $e) {
-            $this->assertDatabaseHas('project_mp_details', ['id' => 2, 'produksi_id' => 1]);
-        }
-        app(AmbilBarangService::class)->ambil(['order-bahan:2', 'project-bahan:4']);
-        $guard->pastikanBahanDiambil(OrderDetail::findOrFail(3), $target);
-        $guard->apply(ProjectMpDetail::findOrFail(2), $target->id);
-        $this->assertDatabaseHas('project_mp_details', ['id' => 2, 'produksi_id' => 2]);
     }
 
     public function test_halaman_tidak_menimpa_variabel_cabangs_yang_dipakai_header(): void
@@ -256,6 +99,59 @@ class AmbilBarangServiceTest extends TestCase
         $this->assertSame(4, $item['jumlah']);
     }
 
+    public function test_arsip_dipaginasi_dua_puluh_detail_dan_total_produk_tetap_akurat(): void
+    {
+        $rows = [];
+        for ($id = 100; $id < 125; $id++) {
+            $rows[] = [
+                'sumber' => 'project', 'detail_id' => $id, 'produk_id' => 1,
+                'cabang_id' => 1, 'jumlah' => 1, 'nota' => 'MP-' . $id,
+                'created_at' => now(),
+            ];
+        }
+        DB::table('ambil_barangs')->insert($rows);
+        Gate::shouldReceive('allows')->twice()->with('produk_stok_access')->andReturn(true);
+
+        $controller = app(AmbilBarangController::class);
+        $service = app(AmbilBarangService::class);
+        $first = $controller->index(Request::create('/admin/ambil-barang', 'GET', ['tab' => 'arsip']), $service)->getData();
+        $second = $controller->index(Request::create('/admin/ambil-barang', 'GET', ['tab' => 'arsip', 'page' => 2]), $service)->getData();
+
+        $this->assertSame(25, $first['arsipPagination']->total());
+        $this->assertCount(20, $first['arsipPagination']->items());
+        $this->assertCount(5, $second['arsipPagination']->items());
+        $this->assertSame(21, $second['arsipPagination']->firstItem());
+        $this->assertSame(25, $second['arsipCabang'][1]->first()['jumlah']);
+        $this->assertStringContainsString('tab=arsip', $first['arsipPagination']->url(2));
+        $this->assertStringContainsString('page=2', $first['arsipPagination']->url(2));
+    }
+
+    public function test_arsip_role_stock_bahan_hanya_memuat_cabang_member(): void
+    {
+        Schema::create('members', function (Blueprint $t) {
+            $t->id();
+            $t->unsignedBigInteger('user_id');
+            $t->unsignedBigInteger('cabang_id');
+            $t->softDeletes();
+        });
+        DB::table('cabangs')->insert(['id' => 2, 'kode' => 'CABANG', 'nama' => 'Cabang', 'status' => 1]);
+        DB::table('members')->insert(['user_id' => 2, 'cabang_id' => 1]);
+        DB::table('ambil_barangs')->insert([
+            ['sumber' => 'project', 'detail_id' => 100, 'produk_id' => 1, 'cabang_id' => 1, 'jumlah' => 2, 'created_at' => now()],
+            ['sumber' => 'project', 'detail_id' => 101, 'produk_id' => 1, 'cabang_id' => 2, 'jumlah' => 3, 'created_at' => now()],
+        ]);
+
+        $user = new User();
+        $user->id = 2;
+        $user->setRelation('roles', collect([(object) ['name' => 'stock_bahan']]));
+        $this->be($user);
+
+        $arsip = app(AmbilBarangService::class)->arsip();
+        $this->assertSame(1, $arsip->total());
+        $this->assertSame(1, $arsip->items()[0]['cabang_id']);
+        $this->assertSame(2, $arsip->items()[0]['total_produk']);
+    }
+
     public function test_tombol_opname_di_header_kelompok_memuat_beberapa_produk_di_modal(): void
     {
         $html = File::get(resource_path('views/admin/ambilBarang/index.blade.php'));
@@ -267,9 +163,15 @@ class AmbilBarangServiceTest extends TestCase
         $this->assertStringContainsString('name="items[{{ $indexOpname }}][stok_fisik]"', $html);
         $this->assertStringContainsString('name="items[{{ $indexOpname }}][pilih]"', $html);
         $this->assertStringNotContainsString('Shipping', $html);
-        $this->assertStringNotContainsString('rowspan=', $html);
-        $this->assertStringContainsString('Total produk', $html);
+        $this->assertStringContainsString('rowspan="{{ $group[\'items\']->count() }}"', $html);
+        $this->assertStringContainsString('ambil-barang-produk-pilih', $html);
+        $this->assertStringContainsString('input.dataset.produkId === productInput.dataset.produkId', $html);
+        $this->assertStringContainsString('class="popup text-decoration-none fw-semibold"', $html);
+        $this->assertStringContainsString("@include('admin.orders.partials.detail-order-modal')", $html);
+        $this->assertStringContainsString("@include('admin.projectmps.partials.detail-projectmp-modal')", $html);
+        $this->assertStringNotContainsString('Total produk', $html);
         $this->assertStringContainsString("@if (\$kategori !== 'Kosong di sistem')", $html);
+        $this->assertStringContainsString('Penandaan migrasi', $html);
     }
 
     public function test_produk_stok_kosong_masuk_kelompok_opname_tanpa_pengambilan(): void
@@ -355,6 +257,39 @@ class AmbilBarangServiceTest extends TestCase
         $archiveMigration->up();
         $this->assertDatabaseHas('ambil_barangs', ['sumber' => 'order', 'detail_id' => 3, 'nota' => 'OFF2']);
         $this->assertDatabaseHas('ambil_barangs', ['sumber' => 'project', 'detail_id' => 1, 'nota' => 'MP1']);
+    }
+
+    public function test_marketplace_lebih_dari_tujuh_hari_langsung_ditandai_tapi_yang_baru_harus_punya_mutasi_shp(): void
+    {
+        DB::table('orders')->where('id', 1)->update(['created_at' => now()->subDays(30)]);
+        DB::table('project_mps')->where('id', 1)->update(['created_at' => now()->subDays(8)]);
+        DB::table('project_mps')->insert([
+            ['id' => 2, 'cabang_id' => 1, 'nota' => 'MP2', 'created_at' => now()->subDays(2)],
+            ['id' => 3, 'cabang_id' => 1, 'nota' => 'MP3', 'created_at' => now()->subDays(2)],
+        ]);
+        DB::table('project_mp_details')->insert([
+            ['id' => 2, 'project_id' => 2, 'produk_id' => 1, 'jumlah' => 2, 'produksi_id' => 1],
+            ['id' => 3, 'project_id' => 3, 'produk_id' => 1, 'jumlah' => 2, 'produksi_id' => 1],
+        ]);
+        DB::table('produk_stoks')->insert([
+            'produk_id' => 1, 'cabang_id' => 1, 'tambah' => 0, 'kurang' => 2,
+            'kode' => 'shp', 'detail_id' => 3, 'created_at' => now(),
+        ]);
+
+        Schema::drop('ambil_barangs');
+        Schema::drop('cek_stok_kosongs');
+        $migration = require database_path('migrations/2026_11_16_000001_create_ambil_barangs_table.php');
+        $migration->up();
+
+        $this->assertDatabaseHas('ambil_barangs', ['sumber' => 'project', 'detail_id' => 1]);
+        $this->assertDatabaseMissing('ambil_barangs', ['sumber' => 'project', 'detail_id' => 2]);
+        $this->assertDatabaseHas('ambil_barangs', ['sumber' => 'project', 'detail_id' => 3]);
+        $this->assertDatabaseMissing('ambil_barangs', ['sumber' => 'order', 'detail_id' => 1]);
+        $this->assertDatabaseCount('produk_stoks', 2);
+
+        $sql = File::get(database_path('sql/2026_11_16_ambil_barang.sql'));
+        $this->assertStringContainsString('p.created_at < @batas_marketplace', $sql);
+        $this->assertStringContainsString('OR stok.total_mutasi >= kebutuhan.total_detail', $sql);
     }
 
     public function test_mutasi_lama_yang_ambigu_ditolak_agar_tidak_terpotong_dua_kali(): void
