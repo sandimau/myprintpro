@@ -78,9 +78,7 @@
                                     Customer Service
                                 </th>
                                 <td>
-                                    @if ($kontak->ar)
-                                        {{ $kontak->ar->member->nama_lengkap }}
-                                    @endif
+                                    {{ $kontak->ar?->member?->nama_lengkap ?? '-' }}
                                 </td>
                             </tr>
                             <tr>

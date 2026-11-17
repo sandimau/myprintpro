@@ -14,19 +14,7 @@ Create Ar
         <form method="POST" action="{{ route('ars.update',$ar->id) }}" enctype="multipart/form-data">
             @method('patch')
             @csrf
-            <div class="form-group mb-3">
-                <label for="member_id">member</label>
-                <select class="form-select {{ $errors->has('member_id') ? 'is-invalid' : '' }}" aria-label="Default select example" name="member_id" id="member_id">
-                    @foreach($members as $id => $entry)
-                        <option value="{{ $id }}" {{ $id == $ar->member_id ? 'selected' : '' }}>{{ $entry }}</option>
-                    @endforeach
-                </select>
-                @if($errors->has('member_id'))
-                    <div class="invalid-feedback">
-                        {{ $errors->first('member_id') }}
-                    </div>
-                @endif
-            </div>
+            @include('admin.ars.fields-cabang-member', ['selectedCabangId' => $ar->member?->cabang_id ?? '', 'selectedMemberId' => $ar->member_id])
             <div class="form-group mb-3">
                 <label class="required" for="kode">kode</label>
                 <input class="form-control {{ $errors->has('kode') ? 'is-invalid' : '' }}" type="text" name="kode" id="kode" value="{{ old('kode',$ar->kode) }}" required>

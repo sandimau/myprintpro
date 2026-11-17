@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Http\Controllers\Admin\KontakController;
+use App\Models\Kontak;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -35,6 +36,13 @@ class KontakCreateCabangTest extends TestCase
             $table->unsignedBigInteger('member_id');
             $table->softDeletes();
         });
+        Schema::create('kontaks', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('ar_id')->nullable();
+            $table->unsignedBigInteger('cabang_id');
+            $table->string('nama');
+            $table->softDeletes();
+        });
 
         DB::table('cabangs')->insert([
             ['id' => 1, 'nama' => 'Pusat', 'kode' => 'PUSAT', 'status' => 1],
@@ -59,5 +67,25 @@ class KontakCreateCabangTest extends TestCase
 
         $this->assertSame([2], $view->getData()['ars']->pluck('id')->all());
         $this->assertSame('CS Jakarta', $view->getData()['ars']->first()->member->nama_lengkap);
+    }
+
+    public function test_detail_kontak_jakarta_menampilkan_cs_terkait_meski_member_di_cabang_lain(): void
+    {
+        session(['cabang_id' => 2]);
+        DB::table('kontaks')->insert(['id' => 1216, 'ar_id' => 1, 'cabang_id' => 2, 'nama' => 'Kontak Jakarta']);
+
+        $view = app(KontakController::class)->show(Kontak::findOrFail(1216));
+
+        $this->assertSame('CS Pusat', $view->getData()['kontak']->ar->member->nama_lengkap);
+    }
+
+    public function test_detail_kontak_tetap_bisa_dibuka_jika_member_ar_tidak_ada(): void
+    {
+        session(['cabang_id' => 2]);
+        DB::table('kontaks')->insert(['id' => 1216, 'ar_id' => 3, 'cabang_id' => 2, 'nama' => 'Kontak Jakarta']);
+
+        $view = app(KontakController::class)->show(Kontak::findOrFail(1216));
+
+        $this->assertNull($view->getData()['kontak']->ar->member);
     }
 }

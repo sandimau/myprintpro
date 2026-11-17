@@ -83,7 +83,8 @@ class KontakController extends Controller
 
     public function show(Kontak $kontak)
     {
-        $ars = Ar::get();
-        return view('admin.kontaks.show', compact('ars', 'kontak'));
+        $kontak->load(['ar.member' => fn ($query) => $query->withoutGlobalScope('cabang')]);
+
+        return view('admin.kontaks.show', compact('kontak'));
     }
 }
