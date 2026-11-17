@@ -116,7 +116,7 @@
                                                                 if ($order) {
                                                                     $total = $order->total;
                                                                     if ($total < 1000000) {
-                                                                        $warna = 'black';
+                                                                        $warna = 'var(--order-price-neutral, black)';
                                                                         if ($total == 0) {
                                                                             $nominal = 0;
                                                                         } else {
@@ -420,6 +420,19 @@
     <style>
         @include('admin.orders.partials.detail-order-modal-styles')
 
+        :root:not([data-theme="light"]),
+        [data-theme="dark"] {
+            --order-card-bg: rgba(255, 255, 255, .03);
+            --order-card-text: var(--app-text-muted);
+            --order-price-neutral: #475569;
+        }
+
+        [data-theme="light"] {
+            --order-card-bg: #ffffff;
+            --order-card-text: #636363;
+            --order-price-neutral: #000000;
+        }
+
         header.header.mb-4 .container-fluid.dashboard-page-header {
             display: flex;
             flex-wrap: nowrap;
@@ -499,7 +512,7 @@
             margin-bottom: 0;
             border-radius: 8px;
             border: 1px solid var(--app-border, #dee2e6);
-            background: var(--app-card-bg, #fff);
+            background: var(--order-card-bg, #fff);
         }
 
         .order-card:last-child {
@@ -571,7 +584,7 @@
 
         .order-product-name {
             flex: 1 1 100%;
-            color: #636363;
+            color: var(--order-card-text, #636363);
             word-break: break-word;
             line-height: 1.4;
         }

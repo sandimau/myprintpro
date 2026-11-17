@@ -419,6 +419,48 @@
             --od-text: #212529;
         }
 
+        :root:not([data-theme="light"]) .order-detail-page,
+        [data-theme="dark"] .order-detail-page {
+            --od-border: var(--app-border);
+            --od-muted: var(--app-text-muted);
+            --od-surface: var(--app-bg);
+            --od-text: var(--app-text);
+            --od-emphasis-bg: #243653;
+            --od-emphasis-border: #3b5990;
+            --od-warn-bg: #3b3025;
+            --od-warn-border: #78532a;
+            --od-table-heading: #273449;
+            --od-table-heading-text: var(--app-text-muted);
+            --od-table-hover: #273449;
+            --od-chat-bg: #273449;
+            --od-shipping-bg: #1b3455;
+            --od-shipping-text: #93c5fd;
+            --od-invoice-bg: #163c35;
+            --od-invoice-text: #6ee7b7;
+            --od-payment-bg: #42351c;
+            --od-payment-text: #fcd34d;
+            --od-note-bg: #36274c;
+            --od-note-text: #d8b4fe;
+        }
+
+        :root:not([data-theme="light"]) .order-detail-page .card-header.bg-white,
+        [data-theme="dark"] .order-detail-page .card-header.bg-white {
+            background-color: var(--app-surface) !important;
+            color: var(--app-text);
+        }
+
+        :root:not([data-theme="light"]) .order-detail-page .text-secondary,
+        [data-theme="dark"] .order-detail-page .text-secondary {
+            color: var(--app-text-muted) !important;
+        }
+
+        :root:not([data-theme="light"]) .order-detail-page .text-bg-light,
+        [data-theme="dark"] .order-detail-page .text-bg-light {
+            background-color: var(--app-bg) !important;
+            color: var(--app-text) !important;
+            border-color: var(--app-border) !important;
+        }
+
         .order-detail-card {
             border-radius: 12px;
             overflow: hidden;
@@ -476,13 +518,13 @@
         }
 
         .order-summary-item.is-emphasis {
-            background: #eef5ff;
-            border-color: #cfe0ff;
+            background: var(--od-emphasis-bg, #eef5ff);
+            border-color: var(--od-emphasis-border, #cfe0ff);
         }
 
         .order-summary-item.is-warn {
-            background: #fff6e8;
-            border-color: #f0d5a8;
+            background: var(--od-warn-bg, #fff6e8);
+            border-color: var(--od-warn-border, #f0d5a8);
         }
 
         .order-table-wrap {
@@ -492,8 +534,8 @@
         }
 
         .order-table thead th {
-            background: #f1f3f5;
-            color: #495057;
+            background: var(--od-table-heading, #f1f3f5);
+            color: var(--od-table-heading-text, #495057);
             font-size: 0.75rem;
             text-transform: uppercase;
             letter-spacing: 0.03em;
@@ -506,11 +548,11 @@
         .order-table tbody td {
             padding: 0.75rem;
             vertical-align: middle;
-            border-color: #edf0f2;
+            border-color: var(--od-border);
         }
 
         .order-table tbody tr:hover {
-            background: #fafbfc;
+            background: var(--od-table-hover, #fafbfc);
         }
 
         .order-produk-cell {
@@ -568,23 +610,23 @@
         }
 
         .order-meta-icon--shipping {
-            background: #e7f1ff;
-            color: #0d6efd;
+            background: var(--od-shipping-bg, #e7f1ff);
+            color: var(--od-shipping-text, #0d6efd);
         }
 
         .order-meta-icon--invoice {
-            background: #e8f7ee;
-            color: #198754;
+            background: var(--od-invoice-bg, #e8f7ee);
+            color: var(--od-invoice-text, #198754);
         }
 
         .order-meta-icon--payment {
-            background: #fff3cd;
-            color: #997404;
+            background: var(--od-payment-bg, #fff3cd);
+            color: var(--od-payment-text, #997404);
         }
 
         .order-meta-icon--note {
-            background: #f3e8ff;
-            color: #6f42c1;
+            background: var(--od-note-bg, #f3e8ff);
+            color: var(--od-note-text, #6f42c1);
         }
 
         .order-meta-label {
@@ -641,7 +683,7 @@
         }
 
         .order-chat-bubble {
-            background: #f1f3f5;
+            background: var(--od-chat-bg, #f1f3f5);
             border-radius: 10px;
             padding: 0.7rem 0.9rem;
             line-height: 1.45;
