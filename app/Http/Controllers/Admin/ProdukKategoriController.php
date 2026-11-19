@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ProdukKategori;
 use App\Models\ProdukKategoriUtama;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ProdukKategoriController extends Controller
 {
@@ -57,7 +58,21 @@ class ProdukKategoriController extends Controller
 
     public function destroy(ProdukKategori $produkKategori)
     {
-        $produkKategori->delete();
-        return redirect()->route('produk-kategori.index')->with('success', 'Kategori berhasil dihapus');
+        abort_unless(user_has_role_insensitive('super'), 403);
+
+        $kategoriUtamaId = $produkKategori->kategori_utama_id;
+
+        DB::transaction(function () use ($produkKategori) {
+            foreach ($produkKategori->produkModels as $model) {
+                foreach ($model->produk as $produk) {
+                    $produk->delete();
+                }
+                $model->delete();
+            }
+            $produkKategori->delete();
+        });
+
+        return redirect()->route('produk-kategori.index', ['kategori_utama_id' => $kategoriUtamaId])
+            ->with('success', 'Kategori dan produk di dalamnya berhasil dihapus');
     }
 }

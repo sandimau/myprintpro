@@ -78,11 +78,12 @@
                         <div class="col-lg-3 col-sm-6">
                             <p class="text-center p-t-10" style="font-size: 13px">Hormat Kami
                                 <br>
-                                <br>
-                                <br>
-                                @if ($member)
-                                    {{ $member->nama_lengkap }}
+                                @if ($order->kontak?->ar?->ttd && is_file(public_path('uploads/ttd/' . $order->kontak->ar->ttd)))
+                                    <img id="ttd" src="{{ asset('uploads/ttd/' . $order->kontak->ar->ttd) }}" alt="Tanda tangan" style="display: block; max-width: 120px; height: 60px; object-fit: contain; margin: 5px auto;">
+                                @else
+                                    <br><br>
                                 @endif
+                                {{ $order->kontak?->ar?->member?->nama_lengkap ?? $member?->nama_lengkap }}
                             </p>
                         </div>
                         <div class="col-lg-5 col-sm-6">
@@ -134,21 +135,6 @@
                 $("div.printableArea").printArea(options);
             });
         });
-
-        function myFunction() {
-            var x = document.getElementById("ttd");
-            if (x.style.visibility === "hidden") {
-                x.style.visibility = "visible";
-            } else {
-                x.style.visibility = "hidden";
-            }
-            var x = document.getElementById("stempel");
-            if (x.style.visibility === "hidden") {
-                x.style.visibility = "visible";
-            } else {
-                x.style.visibility = "hidden";
-            }
-        }
     </script>
     <style>
         @media only screen and (min-width: 600px) {

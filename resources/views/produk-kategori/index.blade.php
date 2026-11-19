@@ -24,6 +24,9 @@
                     <th>Nama</th>
                     <th>Kategori Utama</th>
                     <th>Aksi</th>
+                    @if(user_has_role_insensitive('super'))
+                        <th>Hapus</th>
+                    @endif
                 </tr>
             </thead>
             <tbody>
@@ -34,12 +37,16 @@
                     <td>{{ $kategori->kategoriUtama->nama ?? '-' }}</td>
                     <td>
                         <a href="{{ route('produk-kategori.edit', $kategori) }}" class="btn btn-sm btn-warning">Edit</a>
-                        {{-- <form action="{{ route('produk-kategori.destroy', $kategori) }}" method="POST" class="d-inline">
+                    </td>
+                    @if(user_has_role_insensitive('super'))
+                    <td>
+                        <form action="{{ route('produk-kategori.destroy', $kategori) }}" method="POST" class="d-inline">
                             @csrf
                             @method('DELETE')
-                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Yakin ingin menghapus?')">Hapus</button>
-                        </form> --}}
+                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Yakin ingin menghapus kategori ini beserta semua model dan produknya?')">Hapus</button>
+                        </form>
                     </td>
+                    @endif
                 </tr>
                 @endforeach
             </tbody>

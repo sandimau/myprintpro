@@ -594,7 +594,7 @@ class OrderController extends Controller
 
     public function invoice($order)
     {
-        $order = Order::where('id', $order)->with(['orderDetail'])->first();
+        $order = Order::where('id', $order)->with(['orderDetail', 'kontak.ar.member'])->firstOrFail();
         $sistems = Sistem::get()->pluck('isi', 'nama');
         $member = Member::where('user_id', auth()->user()->id)->first();
         return view('admin.orders.invoice', compact('order', 'sistems', 'member'));
