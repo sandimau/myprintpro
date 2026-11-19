@@ -7,9 +7,9 @@
 @section('content')
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="mb-0"><a href="{{ route('produk-kategori-utama.index') }}" data-produk-popup="Kategori Utama"
+            <h5 class="mb-0"><a href="{{ route('produk-kategori-utama.index') }}"
                     class="text-decoration-none text-primary">{{ $kategori->kategoriUtama->nama }}</a> > <a
-                    href="{{ route('produk-kategori.index', $kategori->kategoriUtama->id) }}" data-produk-popup="Kategori"
+                    href="{{ route('produk-kategori.index', $kategori->kategoriUtama->id) }}"
                     class="text-decoration-none text-primary">{{ $kategori->nama }}</a> > Produk</h5>
             <a href="{{ route('produkModel.create', ['kategori_id' => $kategori->id]) }}" id="tambahProduk" class="btn btn-primary">Tambah
                 Produk</a>
