@@ -49,15 +49,23 @@ class OrderController extends Controller
         return is_status_advance_only();
     }
 
-    public function apiKonsumen()
+    public function apiKonsumen(Request $request)
     {
-        if (isset($_GET['id'])) {
+        if ($request->has('id')) {
             // Get single konsumen by ID
-            $kontak = Kontak::select('nama', 'id', 'perusahaan')->where('id', $_GET['id'])->first();
+            $kontak = Kontak::select('nama', 'id', 'perusahaan', 'noTelp')->where('id', $request->query('id'))->first();
             return response()->json($kontak);
         } else {
-            // Search konsumen by query
-            $kontak = Kontak::select('nama', 'id', 'perusahaan')->where('konsumen', 1)->where('nama', 'LIKE', '%' . $_GET['q'] . '%')->get();
+            // Search konsumen by nama, perusahaan, atau no telp
+            $search = '%' . $request->query('q', '') . '%';
+            $kontak = Kontak::select('nama', 'id', 'perusahaan', 'noTelp')
+                ->where('konsumen', 1)
+                ->where(function ($query) use ($search) {
+                    $query->where('nama', 'LIKE', $search)
+                        ->orWhere('perusahaan', 'LIKE', $search)
+                        ->orWhere('noTelp', 'LIKE', $search);
+                })
+                ->get();
             return response()->json($kontak);
         }
     }
@@ -68,9 +76,17 @@ class OrderController extends Controller
         return response()->json($kontak);
     }
 
-    public function apiSupplier()
+    public function apiSupplier(Request $request)
     {
-        $kontak = Kontak::select('nama', 'id')->where('supplier', 1)->where('nama', 'LIKE', '%' . $_GET['q'] . '%')->get();
+        $search = '%' . $request->query('q', '') . '%';
+        $kontak = Kontak::select('nama', 'id', 'perusahaan', 'noTelp')
+            ->where('supplier', 1)
+            ->where(function ($query) use ($search) {
+                $query->where('nama', 'LIKE', $search)
+                    ->orWhere('perusahaan', 'LIKE', $search)
+                    ->orWhere('noTelp', 'LIKE', $search);
+            })
+            ->get();
         return response()->json($kontak);
     }
 

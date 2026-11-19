@@ -264,7 +264,7 @@
                         })
                 })
             },
-            getResultValue: result => result.perusahaan ? result.nama + ' - ' + result.perusahaan : result.nama,
+            getResultValue: result => [result.nama, result.perusahaan, result.noTelp].filter(Boolean).join(' - '),
             onSubmit: result => {
                 let kontak = document.getElementById('kontakId');
                 if (kontak.value !== String(result.id)) {
