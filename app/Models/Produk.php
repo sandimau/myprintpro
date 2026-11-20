@@ -14,7 +14,7 @@ class Produk extends Model
         'updated_at',
     ];
 
-    protected $fillable = ['nama', 'hpp', 'status', 'produk_model_id'];
+    protected $fillable = ['nama', 'hpp', 'harga_beli_hpp', 'status', 'produk_model_id'];
 
     public function getNamaLengkapAttribute()
     {

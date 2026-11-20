@@ -33,6 +33,7 @@ class JoBoardTest extends TestCase
         });
         Schema::create('orders', function (Blueprint $table) {
             $table->id();
+            $table->unsignedBigInteger('cabang_id')->nullable();
             $table->unsignedBigInteger('kontak_id')->nullable();
             $table->string('nota');
             $table->integer('total');
@@ -51,6 +52,7 @@ class JoBoardTest extends TestCase
         });
         Schema::create('project_mps', function (Blueprint $table) {
             $table->id();
+            $table->unsignedBigInteger('cabang_id')->nullable();
             $table->unsignedBigInteger('order_id')->nullable();
             $table->unsignedBigInteger('marketplace_id')->nullable();
             $table->string('nota');
@@ -78,34 +80,58 @@ class JoBoardTest extends TestCase
             $table->string('nama');
             $table->softDeletes();
         });
+        Schema::create('cabangs', function (Blueprint $table) {
+            $table->id();
+            $table->string('kode');
+        });
 
         DB::table('jo_statuses')->insert(['produksi_id' => 10]);
         DB::table('produksis')->insert(['id' => 10, 'nama' => 'Cetak']);
+        DB::table('cabangs')->insert([
+            ['id' => 1, 'kode' => 'PUSAT'],
+            ['id' => 2, 'kode' => 'CABANG-2'],
+            ['id' => 3, 'kode' => 'CABANG-3'],
+        ]);
         DB::table('orders')->insert([
-            ['id' => 1, 'nota' => 'OFF', 'total' => 1000],
-            ['id' => 2, 'nota' => 'LINKED', 'total' => 2000],
+            ['id' => 1, 'nota' => 'OFF', 'total' => 1000, 'cabang_id' => null],
+            ['id' => 2, 'nota' => 'LINKED', 'total' => 2000, 'cabang_id' => null],
+            ['id' => 3, 'nota' => 'OFF-2', 'total' => 1000, 'cabang_id' => 2],
+            ['id' => 4, 'nota' => 'OFF-3', 'total' => 1000, 'cabang_id' => 3],
         ]);
         DB::table('order_details')->insert([
             ['order_id' => 1, 'produksi_id' => 10],
             ['order_id' => 2, 'produksi_id' => 10],
+            ['order_id' => 3, 'produksi_id' => 10],
+            ['order_id' => 4, 'produksi_id' => 10],
         ]);
         DB::table('project_mps')->insert([
-            ['id' => 11, 'order_id' => 2, 'nota' => 'AKTIF', 'total' => 2000],
-            ['id' => 12, 'order_id' => null, 'nota' => 'SELESAI', 'total' => 3000],
+            ['id' => 11, 'order_id' => 2, 'nota' => 'AKTIF', 'total' => 2000, 'cabang_id' => 2],
+            ['id' => 12, 'order_id' => null, 'nota' => 'SELESAI', 'total' => 3000, 'cabang_id' => null],
+            ['id' => 13, 'order_id' => null, 'nota' => 'ONLINE-3', 'total' => 3000, 'cabang_id' => 3],
         ]);
         DB::table('project_mp_details')->insert([
             ['project_id' => 11, 'produksi_id' => 10],
             ['project_id' => 12, 'produksi_id' => 10],
+            ['project_id' => 13, 'produksi_id' => 10],
         ]);
         DB::table('marketplace_buffers')->insert([
             ['project_id' => 11, 'status' => 'PROCESSED', 'custom' => 1],
             ['project_id' => 12, 'status' => 'PROCESSED', 'custom' => 1],
             ['project_id' => 12, 'status' => 'COMPLETED', 'custom' => 1],
+            ['project_id' => 13, 'status' => 'PROCESSED', 'custom' => 1],
         ]);
 
         $board = app(JoBoard::class);
         $this->assertSame([10], $board->statusIds());
-        $this->assertEqualsCanonicalizing(['OFF', 'AKTIF'], $board->orders($board->statusIds())->pluck('nota')->all());
+        session(['cabang_id' => 'all']);
+        $this->assertEqualsCanonicalizing(['OFF', 'OFF-2', 'OFF-3', 'AKTIF', 'ONLINE-3'], $board->orders($board->statusIds())->pluck('nota')->all());
+
+        session(['cabang_id' => 1]);
+        $this->assertSame(['OFF'], $board->orders($board->statusIds())->pluck('nota')->all());
+        session(['cabang_id' => 2]);
+        $this->assertEqualsCanonicalizing(['OFF-2', 'AKTIF'], $board->orders($board->statusIds())->pluck('nota')->all());
+        session(['cabang_id' => 3]);
+        $this->assertEqualsCanonicalizing(['OFF-3', 'ONLINE-3'], $board->orders($board->statusIds())->pluck('nota')->all());
         $this->assertTrue($board->orders([])->isEmpty());
     }
 }

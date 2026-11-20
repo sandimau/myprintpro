@@ -23,7 +23,11 @@ class JoBoard
 
         $offline = OrderDetail::query()
             ->whereIn('produksi_id', $statusIds)
-            ->whereHas('order')
+            // Relasi OrderDetail::order mengabaikan scope cabang. Filter di sini
+            // agar kartu JO hanya menampilkan order yang dapat dibuka pada cabang aktif.
+            ->whereHas('order', function ($query) {
+                apply_cabang_constraint($query, 'orders.cabang_id');
+            })
             ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('project_mps')
                 ->whereColumn('project_mps.order_id', 'order_details.order_id'))
             ->with(['order.kontak', 'produk.produkModel', 'produksi', 'proses'])

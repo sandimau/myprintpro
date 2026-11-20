@@ -28,7 +28,7 @@
     $activeAnalisaOperasional = request()->is('admin/analisa/operasional*');
     $activeAnalisaStok = request()->is('admin/analisa/stok*');
 
-    $openProduksiOrder = $activeOrderProses || $activeOrderProsesOnline || $activeOrderArsip || $activeOrderOnline || request()->is('admin/jo*');
+    $openProduksiOrder = $activeOrderProses || $activeOrderProsesOnline || $activeOrderArsip || $activeOrderOnline;
     $openData = $navOpen('admin/kontaks*');
     $openKeuangan =
         $navOpen('admin/akunKategoris*', 'admin/akunDetails*', 'admin/belanja*', 'admin/hutang*', 'admin/kas', 'admin/pembayaran*', 'admin/aset-tetap*') ||
@@ -113,14 +113,6 @@
                 Proses Order
             </a>
             <ul class="nav-group-items">
-                @can('order_access')
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->is('admin/jo*') ? 'active' : '' }}" href="{{ route('jo.index') }}">
-                            <svg class="nav-icon"><use xlink:href="{{ asset('icons/coreui.svg#cil-list') }}"></use></svg>
-                            JO
-                        </a>
-                    </li>
-                @endcan
                 @can('order_access')
                     <li class="nav-item">
                         <a class="nav-link {{ $activeOrderProses ? 'active' : '' }}" href="{{ route('order.dashboard') }}">

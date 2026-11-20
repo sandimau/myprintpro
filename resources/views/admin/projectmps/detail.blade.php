@@ -52,8 +52,12 @@
                         </div>
                     </div>
 
-                    @if ($isCustom)
-                        <div class="projectmp-pemproses-box">
+                    <div class="d-flex flex-wrap align-items-end gap-2">
+                        @if ($projectMpdetails->isNotEmpty() || $orderDetails->isNotEmpty())
+                            <button type="button" class="btn btn-outline-primary btn-sm rounded-pill" onclick="cetakSemuaJo()">Cetak Semua JO</button>
+                        @endif
+                        @if ($isCustom)
+                            <div class="projectmp-pemproses-box">
                             <label class="form-label small text-secondary mb-1">Status</label>
                             @if (($canEditCabang ?? false) && !($isMarketingOnly ?? false))
                                 <form action="{{ route('projectMp.pemproses', $projectMp->id) }}" method="post"
@@ -75,8 +79,9 @@
                                     {{ $projectMp->pemproses->nama ?? '-' }}
                                 </div>
                             @endif
-                        </div>
-                    @endif
+                            </div>
+                        @endif
+                    </div>
                 </div>
 
                 <div class="projectmp-summary-grid">
@@ -134,6 +139,7 @@
                                 <th>Pemproses</th>
                                 <th class="text-center">Gambar</th>
                                 <th>Deadline</th>
+                                <th class="text-center">JO</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -284,10 +290,13 @@
                                             @endif
                                         @endif
                                     </td>
+                                    <td class="text-center">
+                                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="cetakJo({{ $loop->index }})">JO</button>
+                                    </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="9" class="text-center text-muted py-4">
+                                    <td colspan="10" class="text-center text-muted py-4">
                                         Belum ada produk
                                     </td>
                                 </tr>
@@ -328,6 +337,7 @@
                                 <th>Label</th>
                                 <th class="text-center">Gambar</th>
                                 <th>Deadline</th>
+                                <th class="text-center">JO</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -469,10 +479,13 @@
                                     <td class="text-nowrap small">
                                         {{ $detail->deathline ? \Carbon\Carbon::parse($detail->deathline)->format('d-m-Y') : '-' }}
                                     </td>
+                                    <td class="text-center">
+                                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="cetakJo({{ $projectMpdetails->count() + $loop->index }})">JO</button>
+                                    </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="10" class="text-center text-muted py-4">
+                                    <td colspan="11" class="text-center text-muted py-4">
                                         Belum ada produk tambahan
                                     </td>
                                 </tr>
@@ -540,6 +553,15 @@
 @endsection
 
 @push('after-scripts')
+    @include('admin.jo.partials.print', [
+        'joNota' => $projectMp->nota,
+        'joKonsumen' => $projectMp->konsumen,
+        'joMarketplace' => $marketplace?->nama,
+        'joDeadline' => $projectMp->deadline,
+        'joTanggalOrder' => $projectMp->created_at,
+        'joOnlineItems' => $projectMpdetails,
+        'joOfflineItems' => $orderDetails,
+    ])
     <style>
         .projectmp-detail-page {
             --pmp-border: #e6e8ec;

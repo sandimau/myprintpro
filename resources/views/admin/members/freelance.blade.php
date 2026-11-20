@@ -45,7 +45,6 @@
                                     <th>umur</th>
                                     <th>lama kerja</th>
                                     <th>upah</th>
-                                    <th>lembur</th>
                                     <th>upah <br>belum dibayar</th>
                                     <th>gaji</th>
                                     <th>wfh</th>
@@ -83,9 +82,6 @@
                                         </td>
                                         <td>
                                             {{ number_format($member->upah) ?? '' }}
-                                        </td>
-                                        <td>
-                                            {{ number_format($member->lembur) ?? '' }}
                                         </td>
                                         <td>
                                             @php

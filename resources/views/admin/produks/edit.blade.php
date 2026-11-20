@@ -30,6 +30,14 @@
                         </div>
 
                         <div class="mb-3">
+                            <label class="form-label" for="harga_beli_hpp">Harga Beli (Rp)</label>
+                            <input type="number" min="0" step="0.00000001" id="harga_beli_hpp" class="form-control @error('harga_beli_hpp') is-invalid @enderror" name="harga_beli_hpp" value="{{ old('harga_beli_hpp', $hargaBeli) }}">
+                            @error('harga_beli_hpp')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        <div class="mb-3">
                             <label class="form-label">HPP (Harga Pokok Penjualan)</label>
                             <input type="number" step="0.01" class="form-control @error('hpp') is-invalid @enderror" name="hpp" value="{{ old('hpp', $produk->hpp) }}">
                             @error('hpp')

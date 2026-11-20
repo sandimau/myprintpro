@@ -92,6 +92,11 @@
                                     invoice
                                 </a>
                             @endif
+                            @if ($orderDetails->isNotEmpty())
+                                <button type="button" class="btn btn-outline-primary btn-sm rounded-pill" onclick="cetakSemuaJo()">
+                                    Cetak Semua JO
+                                </button>
+                            @endif
                         </div>
                     </div>
                 </div>
@@ -145,6 +150,7 @@
                                 <th>Pemproses</th>
                                 <th class="text-center">Gambar</th>
                                 <th>Deadline</th>
+                                <th class="text-center">JO</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -295,10 +301,13 @@
                                     <td class="text-nowrap small">
                                         {{ $detail->deathline ? date('d-m-Y', strtotime($detail->deathline)) : '-' }}
                                     </td>
+                                    <td class="text-center">
+                                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="cetakJo({{ $loop->index }})">JO</button>
+                                    </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="10" class="text-center text-muted py-4">Belum ada produk</td>
+                                    <td colspan="11" class="text-center text-muted py-4">Belum ada produk</td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -411,6 +420,15 @@
 @endsection
 
 @push('after-scripts')
+    @include('admin.jo.partials.print', [
+        'joNota' => $order->nota,
+        'joKonsumen' => $order->kontak?->nama ?? $order->konsumen_detail,
+        'joMarketplace' => null,
+        'joDeadline' => $order->deathline,
+        'joTanggalOrder' => $order->created_at,
+        'joOnlineItems' => collect(),
+        'joOfflineItems' => $orderDetails,
+    ])
     <style>
         .order-detail-page {
             --od-border: #e6e8ec;

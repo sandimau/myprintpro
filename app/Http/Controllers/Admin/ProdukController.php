@@ -136,13 +136,19 @@ class ProdukController extends Controller
     public function edit(Produk $produk)
     {
         $produkModel = ProdukModel::find($produk->produk_model_id);
-        return view('admin.produks.edit', compact('produk', 'produkModel'));
+        $hargaBeli = $produk->harga_beli_hpp ?? DB::table('belanja_details')
+            ->where('produk_id', $produk->id)
+            ->orderByDesc('id')
+            ->value('harga');
+
+        return view('admin.produks.edit', compact('produk', 'produkModel', 'hargaBeli'));
     }
 
     public function update(Request $request, Produk $produk)
     {
         $request->validate([
             'status' => 'required|in:0,1',
+            'harga_beli_hpp' => 'nullable|numeric|min:0',
         ]);
 
         $produkModel = ProdukModel::find($produk->produk_model_id);
