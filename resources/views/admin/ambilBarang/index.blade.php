@@ -18,7 +18,7 @@
 
         <div class="mb-3">
             <h3 class="mb-1">Ambil Barang</h3>
-            <p class="text-muted mb-0">Kebutuhan produk jadi per cabang dan order.</p>
+            <p class="text-muted mb-0">Kebutuhan produk jadi dan bahan resep per cabang dan order.</p>
         </div>
 
         <ul class="nav nav-tabs mb-3" aria-label="Daftar pengambilan barang">
@@ -114,8 +114,8 @@
                                                                 @endif
                                                                 <a href="{{ $item['url'] }}" class="popup text-decoration-none fw-semibold">{{ $item['nota'] ?: '#' . $item['detail_id'] }}</a>
                                                             </td>
-                                                            <td>{{ $item['pembeli'] }}</td>
-                                                            <td>{{ $item['jenis'] }}</td>
+                                                             <td>{{ $item['pembeli'] }}</td>
+                                                             <td>{{ $item['jenis'] }}@if (!empty($item['pesanan_produk']))<div class="small text-muted">Untuk: {{ $item['pesanan_produk'] }}</div>@endif</td>
                                                             <td class="text-end fw-semibold">{{ number_format($item['jumlah'], 0, ',', '.') }}</td>
                                                         </tr>
                                                     @endforeach

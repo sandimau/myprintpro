@@ -326,6 +326,17 @@ Route::group(['namespace' => 'App\Http\Controllers'], function()
             Route::delete('/belanja/{belanja}', 'BelanjaController@destroy')->name('belanja.destroy');
 
             //order
+            // JO: papan gabungan offline + online, detail baca-saja.
+            Route::middleware('can:order_access')->group(function () {
+                Route::get('/jo', 'JoController@index')->name('jo.index');
+                Route::get('/jo/offline/{order}', 'JoController@offline')->name('jo.offline');
+                Route::get('/jo/online/{projectMp}', 'JoController@online')->name('jo.online');
+            });
+            Route::middleware('role:super|admin')->group(function () {
+                Route::get('/jo/pengaturan', 'JoController@settings')->name('jo.settings');
+                Route::post('/jo/pengaturan', 'JoController@saveSettings')->name('jo.settings.save');
+            });
+
             Route::get('/order', 'OrderController@index')->name('order.index');
             Route::get('/order/marketplace', 'OrderController@marketplace')->name('order.marketplace');
             Route::get('/order/create', 'OrderController@create')->name('order.create');

@@ -182,11 +182,15 @@ class ProdukController extends Controller
             ->join('produk_models as pm', 'pm.id', '=', 'p.produk_model_id')
             ->join('produk_kategoris as k', 'k.id', '=', 'pm.kategori_id')
             ->join('produk_kategori_utamas as ku', 'ku.id', '=', 'k.kategori_utama_id')
+            ->leftJoin('belanja_details as bd', function ($join) {
+                $join->on('bd.produk_id', '=', 'p.id')
+                    ->whereRaw('bd.id = (SELECT id FROM belanja_details WHERE produk_id = p.id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1)');
+            })
             ->select(
                 'k.id as kategori_id',
                 'ku.nama as namaKategoriUtama',
                 'k.nama as namaKategori',
-                DB::raw('SUM(t.saldo * pm.harga) as nilai_aset')
+                DB::raw('SUM(t.saldo * COALESCE(bd.harga, 0)) as nilai_aset')
             )
             ->groupBy('k.id', 'ku.nama', 'k.nama')
             ->orderBy('ku.nama')
@@ -203,12 +207,16 @@ class ProdukController extends Controller
             ->join('produk_models as pm', 'pm.id', '=', 'p.produk_model_id')
             ->join('produk_kategoris as k', 'k.id', '=', 'pm.kategori_id')
             ->where('pm.kategori_id', $kategori->id)
+            ->leftJoin('belanja_details as bd', function ($join) {
+                $join->on('bd.produk_id', '=', 'p.id')
+                    ->whereRaw('bd.id = (SELECT id FROM belanja_details WHERE produk_id = p.id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1)');
+            })
             ->select(
                 DB::raw("CONCAT(k.nama, ' - ', pm.nama) as namaProduk"),
                 'p.nama as varian',
                 't.saldo as stok',
-                'pm.harga',
-                DB::raw('t.saldo * pm.harga as nilai_aset')
+                'bd.harga as harga_beli',
+                DB::raw('t.saldo * COALESCE(bd.harga, 0) as nilai_aset')
             )
             ->orderBy('p.nama')
             ->get();

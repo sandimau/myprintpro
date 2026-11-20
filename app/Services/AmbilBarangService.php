@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\AmbilBarang;
 use App\Models\OrderDetail;
+use App\Models\OrderCustomBahan;
 use App\Models\Produk;
 use App\Models\ProjectMpDetail;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -32,12 +33,46 @@ class AmbilBarangService
             apply_cabang_constraint($q, 'project_mps.cabang_id');
         });
 
+        $bahan = OrderCustomBahan::with(['produk.produkModel'])->whereNull('ambil_barang_id')->get();
+        $orderDetails = OrderDetail::with(['order.kontak', 'produk', 'produksi'])
+            ->whereIn('id', $bahan->where('sumber', 'order')->pluck('detail_id'))->get()->keyBy('id');
+        $projectDetails = ProjectMpDetail::with(['projectMp.buffer', 'produk', 'produksi'])
+            ->whereIn('id', $bahan->where('sumber', 'project')->pluck('detail_id'))->get()->keyBy('id');
+        $bahanItems = $bahan->map(function ($row) use ($orderDetails, $projectDetails) {
+            $detail = $row->sumber === 'order' ? $orderDetails->get($row->detail_id) : $projectDetails->get($row->detail_id);
+            $parent = $row->sumber === 'order' ? $detail?->order : $detail?->projectMp;
+            if (! $parent || ! $row->produk || (int) ($row->produk->produkModel?->stok ?? 0) !== 1
+                || ! can_edit_cabang_record($parent->cabang_id)
+                || ($row->sumber === 'order' && in_array(strtolower(trim((string) $detail->produksi?->nama)), ['batal', 'finish'], true))
+                || ($row->sumber === 'project' && $detail->produksi?->nama === 'batal')) {
+                return null;
+            }
+
+            return [
+                'key' => 'bahan:' . $row->id,
+                'sumber' => 'bahan',
+                'detail_id' => $row->id,
+                'produk_id' => (int) $row->produk_id,
+                'produk' => $row->produk->namaLengkap,
+                'cabang_id' => resolve_cabang_id($parent->cabang_id),
+                'jumlah' => (int) $row->jumlah,
+                'nota' => $parent->nota,
+                'pembeli' => $row->sumber === 'order' ? ($parent->kontak?->nama ?? '-') : ($parent->konsumen ?? '-'),
+                'jenis' => 'Bahan resep · ' . ($row->sumber === 'order' && $parent->marketplace === null ? 'Offline' : 'Marketplace'),
+                'pesanan_produk' => $detail->produk?->namaLengkap,
+                'shipping' => trim((string) ($row->sumber === 'order' ? $parent->pengiriman : $parent->shipping)),
+                'tanggal_order' => $parent->created_at,
+                'url' => $row->sumber === 'order' ? route('order.detail', $parent->id) : route('projectmp.detail', $parent->id),
+            ];
+        })->filter();
+
         return $orders->with(['order.kontak', 'produk.produkModel', 'produksi'])->get()
             ->filter(fn ($d) => $d->order && can_edit_cabang_record($d->order->cabang_id))
             ->map(fn ($d) => $this->ringkas($d, 'order'))
             ->concat($projects->with(['projectMp.marketplace', 'projectMp.buffer', 'produk.produkModel', 'produksi'])->get()
                 ->filter(fn ($d) => $d->projectMp && can_edit_cabang_record($d->projectMp->cabang_id))
                 ->map(fn ($d) => $this->ringkas($d, 'project')))
+            ->concat($bahanItems)
             ->groupBy(fn ($item) => $item['cabang_id'] . ':' . $item['produk_id'])
             ->map(function ($items) {
                 $first = $items->first();
@@ -87,6 +122,10 @@ class AmbilBarangService
             ->whereIn('id', $records->where('sumber', 'order')->pluck('detail_id'))->get()->keyBy('id');
         $projectDetails = ProjectMpDetail::with('projectMp')
             ->whereIn('id', $records->where('sumber', 'project')->pluck('detail_id'))->get()->keyBy('id');
+        $bahan = OrderCustomBahan::whereIn('ambil_barang_id', $records->where('sumber', 'bahan')->pluck('id'))
+            ->get()->keyBy('ambil_barang_id');
+        $bahanOrders = OrderDetail::with('order.kontak')->whereIn('id', $bahan->where('sumber', 'order')->pluck('detail_id'))->get()->keyBy('id');
+        $bahanProjects = ProjectMpDetail::with('projectMp')->whereIn('id', $bahan->where('sumber', 'project')->pluck('detail_id'))->get()->keyBy('id');
         $totals = DB::table('ambil_barangs')
             ->whereIn('produk_id', $records->pluck('produk_id')->unique())
             ->whereIn('cabang_id', $records->pluck('cabang_id')->unique())
@@ -94,10 +133,13 @@ class AmbilBarangService
             ->groupBy('cabang_id', 'produk_id')->get()
             ->keyBy(fn ($row) => $row->cabang_id . ':' . $row->produk_id);
 
-        return $pagination->setCollection($records->map(function ($ambil) use ($orderDetails, $projectDetails, $totals) {
-                $parent = $ambil->sumber === 'order'
-                    ? $orderDetails->get($ambil->detail_id)?->order
-                    : $projectDetails->get($ambil->detail_id)?->projectMp;
+        return $pagination->setCollection($records->map(function ($ambil) use ($orderDetails, $projectDetails, $bahan, $bahanOrders, $bahanProjects, $totals) {
+                $bahanRow = $bahan->get($ambil->id);
+                $asal = $bahanRow?->sumber ?? $ambil->sumber;
+                $detailId = $bahanRow?->detail_id ?? $ambil->detail_id;
+                $parent = $ambil->sumber === 'bahan' && ! $bahanRow ? null : ($asal === 'order'
+                    ? ($ambil->sumber === 'bahan' ? $bahanOrders : $orderDetails)->get($detailId)?->order
+                    : ($ambil->sumber === 'bahan' ? $bahanProjects : $projectDetails)->get($detailId)?->projectMp);
 
                 return [
                     'cabang_id' => (int) $ambil->cabang_id,
@@ -106,14 +148,14 @@ class AmbilBarangService
                     'jumlah' => (int) $ambil->jumlah,
                     'total_produk' => (int) ($totals->get($ambil->cabang_id . ':' . $ambil->produk_id)?->total ?? $ambil->jumlah),
                     'nota' => $ambil->nota ?: ($parent?->nota ?? '-'),
-                    'pembeli' => $ambil->pembeli ?: ($ambil->sumber === 'project' ? $parent?->konsumen : $parent?->kontak?->nama) ?: '-',
-                    'jenis' => $ambil->jenis ?: ($ambil->sumber === 'project' ? 'Produk' : 'Offline'),
-                    'shipping' => $ambil->shipping ?: ($ambil->sumber === 'project' ? $parent?->shipping : $parent?->pengiriman) ?: '',
+                    'pembeli' => $ambil->pembeli ?: ($asal === 'project' ? $parent?->konsumen : $parent?->kontak?->nama) ?: '-',
+                    'jenis' => $ambil->jenis ?: ($ambil->sumber === 'bahan' ? 'Bahan resep' : ($asal === 'project' ? 'Produk' : 'Offline')),
+                    'shipping' => $ambil->shipping ?: ($asal === 'project' ? $parent?->shipping : $parent?->pengiriman) ?: '',
                     'tanggal_order' => $ambil->tanggal_order ?: $parent?->created_at,
                     'diambil_pada' => $ambil->created_at,
                     'penandaan_migrasi' => $ambil->produk_stok_id === null,
                     'url' => $parent
-                        ? ($ambil->sumber === 'project' ? route('projectmp.detail', $parent->id) : route('order.detail', $parent->id))
+                        ? ($asal === 'project' ? route('projectmp.detail', $parent->id) : route('order.detail', $parent->id))
                         : null,
                 ];
             })->values());
@@ -127,8 +169,26 @@ class AmbilBarangService
         return DB::transaction(function () use ($keys) {
             $items = [];
             foreach ($keys as $key) {
-                if (! preg_match('/^(order|project):([1-9][0-9]*)$/', $key, $match)) {
+                if (! preg_match('/^(order|project|bahan):([1-9][0-9]*)$/', $key, $match)) {
                     throw ValidationException::withMessages(['items' => 'Detail order tidak valid.']);
+                }
+
+                if ($match[1] === 'bahan') {
+                    $detail = OrderCustomBahan::with('produk.produkModel')->lockForUpdate()->find($match[2]);
+                    $pesanan = $detail?->sumber === 'order'
+                        ? OrderDetail::with(['order', 'produksi'])->find($detail->detail_id)
+                        : ProjectMpDetail::with(['projectMp', 'produksi'])->find($detail?->detail_id);
+                    $parent = $detail?->sumber === 'order' ? $pesanan?->order : $pesanan?->projectMp;
+                    if (! $detail || ! in_array($detail->sumber, ['order', 'project'], true)
+                        || $detail->ambil_barang_id || ! $pesanan || ! $parent
+                        || ($detail->sumber === 'order' && in_array(strtolower(trim((string) $pesanan->produksi?->nama)), ['batal', 'finish'], true))
+                        || ($detail->sumber === 'project' && $pesanan->produksi?->nama === 'batal')
+                        || (int) ($detail->produk?->produkModel?->stok ?? 0) !== 1
+                        || ! can_edit_cabang_record($parent->cabang_id) || (int) $detail->jumlah <= 0) {
+                        throw ValidationException::withMessages(['items' => 'Bahan resep tidak tersedia untuk pengambilan.']);
+                    }
+                    $items[] = compact('detail', 'parent') + ['sumber' => 'bahan', 'cabang_id' => resolve_cabang_id($parent->cabang_id)];
+                    continue;
                 }
 
                 $detail = $match[1] === 'order'
@@ -170,29 +230,31 @@ class AmbilBarangService
                     throw ValidationException::withMessages(['items' => 'Barang untuk salah satu detail sudah diambil. Muat ulang halaman.']);
                 }
 
-                // Bila mutasi lama tidak bisa dialokasikan dengan pasti oleh
-                // migrasi (mis. ID dokumen beririsan), jangan potong dua kali.
-                $legacy = DB::table('produk_stoks')
-                    ->where('detail_id', $item['parent']->id)
-                    ->where('produk_id', $detail->produk_id)
-                    ->where('cabang_id', $item['cabang_id'])
-                    ->where('kode', $sumber === 'project' ? 'shp' : 'jual')
-                    ->whereNotIn('id', AmbilBarang::query()->select('produk_stok_id')->whereNotNull('produk_stok_id'))
-                    ->whereNull('deleted_at');
-                if ($sumber === 'order') {
-                    $legacy->where('keterangan', 'like', 'barang dijual ke%');
-                }
-                if ($legacy->exists()) {
-                    throw ValidationException::withMessages([
-                        'items' => 'Ada mutasi penjualan lama yang belum bisa dicocokkan otomatis untuk nota ' . $item['parent']->nota
-                            . '. Periksa riwayat stok terlebih dahulu agar tidak dipotong dua kali.',
-                    ]);
+                if ($sumber !== 'bahan') {
+                    // Bila mutasi lama tidak bisa dialokasikan dengan pasti oleh
+                    // migrasi (mis. ID dokumen beririsan), jangan potong dua kali.
+                    $legacy = DB::table('produk_stoks')
+                        ->where('detail_id', $item['parent']->id)
+                        ->where('produk_id', $detail->produk_id)
+                        ->where('cabang_id', $item['cabang_id'])
+                        ->where('kode', $sumber === 'project' ? 'shp' : 'jual')
+                        ->whereNotIn('id', AmbilBarang::query()->select('produk_stok_id')->whereNotNull('produk_stok_id'))
+                        ->whereNull('deleted_at');
+                    if ($sumber === 'order') {
+                        $legacy->where('keterangan', 'like', 'barang dijual ke%');
+                    }
+                    if ($legacy->exists()) {
+                        throw ValidationException::withMessages([
+                            'items' => 'Ada mutasi penjualan lama yang belum bisa dicocokkan otomatis untuk nota ' . $item['parent']->nota
+                                . '. Periksa riwayat stok terlebih dahulu agar tidak dipotong dua kali.',
+                        ]);
+                    }
                 }
 
                 $stok = $stokService->kurang((int) $detail->produk_id, $item['cabang_id'], (int) $detail->jumlah,
-                    'jual', 'ambil barang order ' . $item['parent']->nota . ' (' . $sumber . ' #' . $detail->id . ')',
+                    'jual', ($sumber === 'bahan' ? 'ambil bahan resep order ' : 'ambil barang order ') . $item['parent']->nota . ' (' . $sumber . ' #' . $detail->id . ')',
                     $item['parent']->id);
-                AmbilBarang::create([
+                $ambil = AmbilBarang::create([
                     'sumber' => $sumber,
                     'detail_id' => $detail->id,
                     'produk_id' => $detail->produk_id,
@@ -202,11 +264,14 @@ class AmbilBarangService
                     'user_id' => auth()->id(),
                     'created_at' => now(),
                     'nota' => $item['parent']->nota,
-                    'pembeli' => $sumber === 'project' ? $item['parent']->konsumen : $item['parent']->kontak?->nama,
-                    'jenis' => $sumber === 'order' ? 'Offline' : ($item['parent']->buffer?->custom ? 'Proses' : 'Produk'),
-                    'shipping' => $sumber === 'order' ? $item['parent']->pengiriman : $item['parent']->shipping,
+                    'pembeli' => ($sumber === 'bahan' ? $detail->sumber : $sumber) === 'project' ? $item['parent']->konsumen : $item['parent']->kontak?->nama,
+                    'jenis' => $sumber === 'bahan' ? 'Bahan resep · ' . ($detail->sumber === 'order' && $item['parent']->marketplace === null ? 'Offline' : 'Marketplace') : ($sumber === 'order' ? 'Offline' : ($item['parent']->buffer?->custom ? 'Proses' : 'Produk')),
+                    'shipping' => ($sumber === 'bahan' ? $detail->sumber : $sumber) === 'order' ? $item['parent']->pengiriman : $item['parent']->shipping,
                     'tanggal_order' => $item['parent']->created_at,
                 ]);
+                if ($sumber === 'bahan') {
+                    $detail->update(['ambil_barang_id' => $ambil->id]);
+                }
             }
 
             return count($items);

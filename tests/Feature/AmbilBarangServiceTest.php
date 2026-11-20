@@ -43,6 +43,7 @@ class AmbilBarangServiceTest extends TestCase
         Schema::create('produk_stoks', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('produk_id'); $t->unsignedBigInteger('cabang_id'); $t->integer('tambah'); $t->integer('kurang'); $t->integer('hpp')->nullable(); $t->string('kode')->nullable(); $t->string('keterangan')->nullable(); $t->unsignedBigInteger('detail_id')->nullable(); $t->unsignedBigInteger('user_id')->nullable(); $t->timestamps(); $t->softDeletes(); });
         Schema::create('produk_last_stoks', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('produk_id'); $t->unsignedBigInteger('cabang_id'); $t->integer('tahun'); $t->integer('saldo'); $t->timestamps(); });
         Schema::create('ambil_barangs', function (Blueprint $t) { $t->id(); $t->string('sumber'); $t->unsignedBigInteger('detail_id'); $t->unsignedBigInteger('produk_id'); $t->unsignedBigInteger('cabang_id'); $t->integer('jumlah'); $t->unsignedBigInteger('produk_stok_id')->nullable(); $t->unsignedBigInteger('user_id')->nullable(); $t->timestamp('created_at')->nullable(); $t->string('nota')->nullable(); $t->string('pembeli')->nullable(); $t->string('jenis')->nullable(); $t->string('shipping')->nullable(); $t->timestamp('tanggal_order')->nullable(); $t->unique(['sumber', 'detail_id']); });
+        Schema::create('order_custom_bahans', function (Blueprint $t) { $t->id(); $t->string('sumber'); $t->unsignedBigInteger('detail_id'); $t->unsignedBigInteger('produk_id'); $t->unsignedInteger('jumlah'); $t->unsignedInteger('hpp')->default(0); $t->unsignedBigInteger('ambil_barang_id')->nullable(); $t->timestamps(); });
         Schema::create('cek_stok_kosongs', function (Blueprint $t) { $t->id(); $t->unsignedBigInteger('produk_id'); $t->unsignedBigInteger('cabang_id'); $t->timestamp('created_at')->nullable(); });
 
         DB::table('cabangs')->insert(['id' => 1, 'kode' => 'PUSAT', 'nama' => 'Pusat', 'status' => 1]);
@@ -75,6 +76,63 @@ class AmbilBarangServiceTest extends TestCase
         $this->assertSame(9, $group['jumlah']);
         $this->assertSame(6, $group['stok']);
         $this->assertEqualsCanonicalizing(['order:1', 'project:1'], $group['items']->pluck('key')->all());
+    }
+
+    public function test_bahan_resep_offline_dan_marketplace_muncul_dan_dipotong_sekali(): void
+    {
+        DB::table('order_custom_bahans')->insert([
+            ['id' => 1, 'sumber' => 'order', 'detail_id' => 2, 'produk_id' => 1, 'jumlah' => 3],
+            ['id' => 2, 'sumber' => 'project', 'detail_id' => 1, 'produk_id' => 1, 'jumlah' => 2],
+        ]);
+
+        $service = app(AmbilBarangService::class);
+        $group = $service->kebutuhan()->sole();
+        $this->assertSame(14, $group['jumlah']);
+        $this->assertEqualsCanonicalizing(['order:1', 'project:1', 'bahan:1', 'bahan:2'], $group['items']->pluck('key')->all());
+        $this->assertSame('Bahan resep · Offline', $group['items']->firstWhere('key', 'bahan:1')['jenis']);
+        $this->assertSame('Bahan resep · Marketplace', $group['items']->firstWhere('key', 'bahan:2')['jenis']);
+
+        $this->assertSame(2, $service->ambil(['bahan:1', 'bahan:2']));
+        $this->assertSame(1, app(\App\Services\StokService::class)->saldoTersedia(1, 1));
+        $this->assertDatabaseHas('ambil_barangs', ['sumber' => 'bahan', 'detail_id' => 1, 'jumlah' => 3]);
+        $this->assertDatabaseHas('ambil_barangs', ['sumber' => 'bahan', 'detail_id' => 2, 'jumlah' => 2]);
+        $this->assertNotNull(DB::table('order_custom_bahans')->where('id', 1)->value('ambil_barang_id'));
+        $this->assertEqualsCanonicalizing(['order:1', 'project:1'], $service->kebutuhan()->sole()['items']->pluck('key')->all());
+        $this->assertSame('OFF1', $service->arsip()->getCollection()->firstWhere('jenis', 'Bahan resep · Offline')['nota']);
+
+        $this->expectException(ValidationException::class);
+        $service->ambil(['bahan:1']);
+    }
+
+    public function test_bahan_resep_tidak_bisa_diambil_ketika_stok_kurang_atau_order_batal(): void
+    {
+        DB::table('order_custom_bahans')->insert(['id' => 1, 'sumber' => 'order', 'detail_id' => 2, 'produk_id' => 1, 'jumlah' => 7]);
+        try {
+            app(AmbilBarangService::class)->ambil(['bahan:1']);
+            $this->fail('Stok tidak cukup.');
+        } catch (ValidationException $e) {
+            $this->assertDatabaseCount('ambil_barangs', 0);
+            $this->assertNull(DB::table('order_custom_bahans')->where('id', 1)->value('ambil_barang_id'));
+        }
+
+        DB::table('produksis')->insert(['id' => 2, 'nama' => 'batal', 'grup' => 'batal']);
+        DB::table('order_details')->where('id', 2)->update(['produksi_id' => 2]);
+        $this->assertEqualsCanonicalizing(['order:1', 'project:1'], app(AmbilBarangService::class)->kebutuhan()->sole()['items']->pluck('key')->all());
+        $this->expectException(ValidationException::class);
+        app(AmbilBarangService::class)->ambil(['bahan:1']);
+    }
+
+    public function test_bahan_resep_dari_order_marketplace_juga_muncul(): void
+    {
+        DB::table('orders')->insert(['id' => 2, 'kontak_id' => 1, 'cabang_id' => 1, 'nota' => 'CSV1', 'marketplace' => 1]);
+        DB::table('order_details')->insert(['id' => 3, 'order_id' => 2, 'produk_id' => 2, 'jumlah' => 2, 'produksi_id' => 1]);
+        DB::table('order_custom_bahans')->insert(['id' => 1, 'sumber' => 'order', 'detail_id' => 3, 'produk_id' => 1, 'jumlah' => 2]);
+
+        $item = app(AmbilBarangService::class)->kebutuhan()->sole()['items']->firstWhere('key', 'bahan:1');
+        $this->assertSame('Bahan resep · Marketplace', $item['jenis']);
+        $this->assertSame('CSV1', $item['nota']);
+        $this->assertSame(1, app(AmbilBarangService::class)->ambil(['bahan:1']));
+        $this->assertDatabaseHas('ambil_barangs', ['sumber' => 'bahan', 'detail_id' => 1, 'jumlah' => 2]);
     }
 
     public function test_marketplace_produk_langsung_memotong_stok_sekali_dan_custom_tetap_menunggu_pengambilan(): void
