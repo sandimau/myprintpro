@@ -187,12 +187,22 @@ class PenggajianController extends Controller
 
     public function slip(Penggajian $penggajian)
     {
-        return view('admin.penggajians.slip',compact('penggajian'));
+        $penggajian->load('member');
+        $gajiPokok = $penggajian->member->jenis === 'freelance'
+            ? (int) $penggajian->member->upah * (int) $penggajian->pokok
+            : $penggajian->pokok;
+
+        return view('admin.penggajians.slip', compact('penggajian', 'gajiPokok'));
     }
 
     public function createFreelance(Member $member)
     {
-        $jmlLembur = Lembur::where([['member_id', '=', $member->id], ['dibayar', '=', 'belum']])->where('status', 'approved')->sum('jam');
+        $lembursBelumDibayar = Lembur::where('member_id', $member->id)
+            ->where('dibayar', 'belum')
+            ->where('status', 'approved')
+            ->orderBy('id')
+            ->get();
+        $jmlLembur = $lembursBelumDibayar->sum('jam');
         $totalLembur = $member->lembur * $jmlLembur;
 
         $tagihansBelumDibayar = FreelanceTagihan::where('member_id', $member->id)
@@ -215,6 +225,7 @@ class PenggajianController extends Controller
             'kas',
             'totalLembur',
             'jmlLembur',
+            'lembursBelumDibayar',
             'tagihansBelumDibayar',
             'jumlahHari',
             'totalTagihan',
@@ -251,6 +262,9 @@ class PenggajianController extends Controller
                 : (int) $member->upah * $jumlahHari;
             $jmlLembur = Lembur::where('member_id', $member->id)
                 ->where('dibayar', 'belum')->where('status', 'approved')->sum('jam');
+            if ($jmlLembur > 0 && (int) $member->lembur <= 0) {
+                throw ValidationException::withMessages(['lembur' => 'Tarif lembur freelance belum diisi. Isi tarif lembur sebelum membayar lembur.']);
+            }
             $totalLembur = (int) ($member->lembur * $jmlLembur);
             $total = $upah + $totalLembur + (int) ($request->jumlah_lain ?? 0) - $potonganKasbon;
             if ($total < 0) {

@@ -26,6 +26,7 @@ class FreelancePenggajianKasbonTest extends TestCase
         Schema::create('members', function (Blueprint $table) {
             $table->id();
             $table->string('nama_lengkap');
+            $table->string('jenis')->default('freelance');
             $table->integer('upah');
             $table->integer('lembur');
             $table->softDeletes();
@@ -68,6 +69,7 @@ class FreelancePenggajianKasbonTest extends TestCase
             $table->string('dibayar');
             $table->string('status');
             $table->integer('jam');
+            $table->string('keterangan')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });
@@ -180,6 +182,75 @@ class FreelancePenggajianKasbonTest extends TestCase
             'pengeluaran' => 50000,
             'saldo' => 100000,
         ]);
+    }
+
+    public function test_form_only_lists_approved_unpaid_overtime(): void
+    {
+        [$memberId] = $this->seedFreelance(0, 100000);
+        foreach ([
+            ['jam' => 5, 'dibayar' => 'belum', 'status' => 'approved', 'keterangan' => 'Belum dibayar'],
+            ['jam' => 3, 'dibayar' => 'sudah', 'status' => 'approved', 'keterangan' => 'Sudah dibayar'],
+            ['jam' => 2, 'dibayar' => 'belum', 'status' => 'waiting', 'keterangan' => 'Belum disetujui'],
+        ] as $lembur) {
+            DB::table('lemburs')->insert(array_merge(['member_id' => $memberId], $lembur));
+        }
+
+        $form = app(PenggajianController::class)->createFreelance(Member::findOrFail($memberId));
+        $this->assertEquals(5, $form->getData()['jmlLembur']);
+        $this->assertEquals(100000, $form->getData()['totalLembur']);
+        $this->assertEquals(['Belum dibayar'], $form->getData()['lembursBelumDibayar']->pluck('keterangan')->all());
+    }
+
+    public function test_overtime_with_zero_rate_cannot_be_marked_paid(): void
+    {
+        [$memberId, $akunId] = $this->seedFreelance(0, 100000);
+        DB::table('members')->where('id', $memberId)->update(['lembur' => 0]);
+        DB::table('lemburs')->insert([
+            'member_id' => $memberId, 'dibayar' => 'belum', 'status' => 'approved', 'jam' => 5,
+        ]);
+
+        $form = app(PenggajianController::class)->createFreelance(Member::findOrFail($memberId));
+        $this->assertEquals(5, $form->getData()['jmlLembur']);
+        $this->assertEquals(0, $form->getData()['totalLembur']);
+
+        $this->postJson('/admin/freelance/penggajian/create', [
+            'member_id' => $memberId,
+            'akun_detail_id' => $akunId,
+            'jumlah_hari' => 1,
+        ])->assertUnprocessable()->assertJsonValidationErrors('lembur');
+
+        $this->assertDatabaseCount('penggajians', 0);
+        $this->assertDatabaseHas('lemburs', ['member_id' => $memberId, 'dibayar' => 'belum']);
+        $this->assertDatabaseHas('freelance_tagihans', ['member_id' => $memberId, 'dibayar' => 'belum']);
+    }
+
+    public function test_freelance_slip_shows_daily_pay_times_days_as_base_pay(): void
+    {
+        [$memberId, $akunId] = $this->seedFreelance(0, 100000);
+        $penggajianId = DB::table('penggajians')->insertGetId([
+            'member_id' => $memberId, 'akun_detail_id' => $akunId,
+            'pokok' => 3, 'jam_lembur' => 0, 'lembur' => 0,
+            'kasbon' => 0, 'jumlah_lain' => 0, 'total' => 300000,
+        ]);
+
+        $slip = app(PenggajianController::class)->slip(\App\Models\Penggajian::findOrFail($penggajianId));
+
+        $this->assertSame(300000, $slip->getData()['gajiPokok']);
+    }
+
+    public function test_employee_slip_keeps_saved_base_pay(): void
+    {
+        [$memberId, $akunId] = $this->seedFreelance(0, 100000);
+        DB::table('members')->where('id', $memberId)->update(['jenis' => 'karyawan']);
+        $penggajianId = DB::table('penggajians')->insertGetId([
+            'member_id' => $memberId, 'akun_detail_id' => $akunId,
+            'pokok' => 2500000, 'jam_lembur' => 0, 'lembur' => 0,
+            'kasbon' => 0, 'jumlah_lain' => 0, 'total' => 2500000,
+        ]);
+
+        $slip = app(PenggajianController::class)->slip(\App\Models\Penggajian::findOrFail($penggajianId));
+
+        $this->assertSame(2500000, $slip->getData()['gajiPokok']);
     }
 
     private function seedFreelance(int $saldoKasbon, int $nominalUpah): array

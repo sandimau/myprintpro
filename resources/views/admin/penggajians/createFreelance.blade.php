@@ -26,6 +26,25 @@
                         <input type="hidden" name="jam_lembur" value="{{ $jmlLembur }}">
                     </div>
                 </div>
+                @if($lembursBelumDibayar->isNotEmpty())
+                    <div class="alert alert-info mb-3">
+                        <strong>Lembur disetujui yang belum dibayar</strong>
+                        <ul class="mb-0 mt-2 small">
+                            @foreach($lembursBelumDibayar as $lembur)
+                                <li>{{ $lembur->created_at ? $lembur->created_at->format('d/m/Y') : '-' }}
+                                    — {{ $lembur->keterangan }} ({{ $lembur->jam }} jam)</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+                @if($jmlLembur > 0 && (int) $member->lembur <= 0)
+                    <div class="alert alert-warning mb-3">
+                        Tarif lembur freelance belum diisi. <a href="{{ route('freelance.edit', $member->id) }}">Isi tarif lembur</a> sebelum menyimpan penggajian.
+                    </div>
+                @endif
+                @error('lembur')
+                    <div class="alert alert-danger mb-3">{{ $message }}</div>
+                @enderror
                 <div class="form-group mb-3">
                     <label class="control-label ">tunjangan lembur</label>
                     <div class="">

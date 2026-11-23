@@ -29,7 +29,7 @@
                                 <tbody>
                                     <tr>
                                         <td>Gaji Pokok</td>
-                                        <td class="text-right">{{ number_format($penggajian->pokok, 0, ',', '.') }}</td>
+                                        <td class="text-right">{{ number_format($gajiPokok, 0, ',', '.') }}</td>
                                     </tr>
                                     <tr>
                                         <td>Tunjangan Lama Kerja</td>
