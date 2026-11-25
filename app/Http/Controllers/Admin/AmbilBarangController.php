@@ -64,14 +64,7 @@ class AmbilBarangController extends Controller
     public function store(Request $request, AmbilBarangService $service)
     {
         $this->authorizeStok();
-        $data = $request->validate([
-            'items' => 'required|array|min:1',
-            'items.*' => ['required', 'string', 'regex:/^(order|project|bahan):[1-9][0-9]*$/'],
-        ]);
-
-        $jumlah = $service->ambil($data['items']);
-
-        return back()->withSuccess("Barang untuk {$jumlah} detail order berhasil diambil.");
+        abort(410, 'Pengambilan barang manual telah dinonaktifkan. Stok dipotong saat status keluar dari grup awal.');
     }
 
     public function opname(Request $request, StokService $stokService)

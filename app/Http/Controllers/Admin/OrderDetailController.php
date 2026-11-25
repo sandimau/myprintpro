@@ -361,17 +361,7 @@ class OrderDetailController extends Controller
 
     private function applyProduksiStatus(OrderDetail $detail, int $produksiId): void
     {
-        DB::transaction(function () use ($detail, $produksiId) {
-            $detail = OrderDetail::whereKey($detail->id)->lockForUpdate()->firstOrFail();
-            app(\App\Services\ProduksiStatusService::class)->pastikanBahanDiambil($detail, Produksi::findOrFail($produksiId));
-            $detail->loadMissing(['produk.produkModel', 'order.kontak']);
-
-            $detail->update([
-                'produksi_id' => $produksiId,
-                'hpp' => app(\App\Services\ProdukCustomService::class)->isCustom((int) $detail->produk_id)
-                    ? $detail->hpp : $detail->produk->hpp,
-            ]);
-        });
+        app(\App\Services\ProduksiStatusService::class)->apply($detail, $produksiId);
     }
 
     public function updatePemproses(Request $request, OrderDetail $detail)

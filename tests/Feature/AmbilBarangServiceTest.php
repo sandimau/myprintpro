@@ -135,7 +135,7 @@ class AmbilBarangServiceTest extends TestCase
         $this->assertDatabaseHas('ambil_barangs', ['sumber' => 'bahan', 'detail_id' => 1, 'jumlah' => 2]);
     }
 
-    public function test_marketplace_produk_langsung_memotong_stok_sekali_dan_custom_tetap_menunggu_pengambilan(): void
+    public function test_produk_non_custom_shopee_dipotong_saat_buffer_tanpa_duplikasi_saat_status_berubah(): void
     {
         DB::table('marketplace_buffers')->insert([
             ['mp' => 'shopee', 'nota' => 'MP-PRODUK'],
@@ -172,20 +172,120 @@ class AmbilBarangServiceTest extends TestCase
         $custom = DB::table('project_mp_details')->where('nota', 'MP-CUSTOM')->first();
         $campur = DB::table('project_mp_details')->where('nota', 'MP-CAMPUR')->orderBy('id')->get();
         $this->assertDatabaseHas('produk_stoks', ['kode' => 'shp', 'detail_id' => $produk->project_id, 'kurang' => 2]);
-        $this->assertDatabaseHas('ambil_barangs', ['sumber' => 'project', 'detail_id' => $produk->id, 'jenis' => 'Produk']);
-        $this->assertDatabaseHas('ambil_barangs', ['sumber' => 'project', 'detail_id' => $campur[0]->id, 'jenis' => 'Produk']);
+        $this->assertDatabaseHas('ambil_barangs', ['sumber' => 'project', 'detail_id' => $produk->id]);
+        $this->assertDatabaseHas('ambil_barangs', ['sumber' => 'project', 'detail_id' => $campur[0]->id]);
         $this->assertDatabaseMissing('ambil_barangs', ['sumber' => 'project', 'detail_id' => $custom->id]);
-        $this->assertDatabaseMissing('ambil_barangs', ['sumber' => 'project', 'detail_id' => $campur[1]->id]);
         $this->assertSame(3, app(\App\Services\StokService::class)->saldoTersedia(1, 1));
-        $this->assertEqualsCanonicalizing(['project:' . $custom->id, 'project:' . $campur[1]->id, 'order:1', 'project:1'], app(AmbilBarangService::class)->kebutuhan()->first()['items']->pluck('key')->all());
 
         $process->invoke($controller, $marketplace, $buffers);
         $this->assertDatabaseCount('ambil_barangs', 2);
         $this->assertDatabaseCount('project_mp_details', 5);
         $this->assertDatabaseCount('produk_stoks', 3);
 
-        $this->assertSame(1, app(AmbilBarangService::class)->ambil(['project:' . $campur[1]->id]));
-        $this->assertDatabaseCount('ambil_barangs', 3);
+        DB::table('produksis')->insert(['id' => 2, 'nama' => 'Desain', 'grup' => 'Desain']);
+        $status = app(\App\Services\ProduksiStatusService::class);
+        $status->apply(\App\Models\ProjectMpDetail::find($produk->id), 2);
+        $status->apply(\App\Models\ProjectMpDetail::find($campur[0]->id), 2);
+        $this->assertSame(3, app(\App\Services\StokService::class)->saldoTersedia(1, 1));
+        $this->assertDatabaseCount('ambil_barangs', 2);
+        $status->apply(\App\Models\ProjectMpDetail::find($produk->id), 1);
+        $status->apply(\App\Models\ProjectMpDetail::find($produk->id), 2);
+        $this->assertSame(3, app(\App\Services\StokService::class)->saldoTersedia(1, 1));
+    }
+
+    public function test_bahan_resep_dipotong_saat_keluar_awal_tanpa_ambil_barang(): void
+    {
+        DB::table('produksis')->insert(['id' => 2, 'nama' => 'Desain', 'grup' => 'Desain']);
+        DB::table('project_mp_details')->insert([
+            'id' => 2, 'project_id' => 1, 'produk_id' => 2, 'jumlah' => 2, 'produksi_id' => 1,
+            'material_ids' => '[]', 'custom_resep_disalin_at' => now(),
+        ]);
+        DB::table('order_custom_bahans')->insert([
+            'sumber' => 'project', 'detail_id' => 2, 'produk_id' => 1, 'jumlah' => 3,
+        ]);
+
+        $service = app(\App\Services\ProduksiStatusService::class);
+        $service->apply(\App\Models\ProjectMpDetail::find(2), 2);
+        $this->assertSame(3, app(\App\Services\StokService::class)->saldoTersedia(1, 1));
+        $this->assertDatabaseCount('ambil_barangs', 0);
+        $service->apply(\App\Models\ProjectMpDetail::find(2), 1);
+        $service->apply(\App\Models\ProjectMpDetail::find(2), 2);
+        $this->assertSame(3, app(\App\Services\StokService::class)->saldoTersedia(1, 1));
+    }
+
+    public function test_sku_custom_beresep_dari_buffer_memotong_bahan_hanya_saat_status_berubah(): void
+    {
+        Schema::table('produks', fn (Blueprint $t) => $t->boolean('status')->default(true));
+        DB::table('produk_kategori_utamas')->where('id', 1)->update(['is_custom' => 1]);
+        Schema::create('produk_custom_reseps', function (Blueprint $t) {
+            $t->id(); $t->unsignedBigInteger('produk_id'); $t->string('jenis');
+            $t->unsignedBigInteger('komponen_model_id'); $t->decimal('jumlah', 12, 2);
+            $t->boolean('per_order')->default(false); $t->unsignedInteger('biaya')->nullable();
+            $t->timestamps();
+        });
+        DB::table('produk_custom_reseps')->insert([
+            'produk_id' => 2, 'jenis' => 'bahan', 'komponen_model_id' => 1, 'jumlah' => 2,
+        ]);
+        DB::table('marketplace_buffers')->insert(['mp' => 'shopee', 'nota' => 'CUSTOM-RESEP']);
+        $marketplace = (object) ['id' => 1, 'cabang_id' => 1, 'nama' => 'Shopee', 'shop_id' => 10];
+        $controller = \Mockery::mock(BufferController::class)->makePartial()->shouldAllowMockingProtectedMethods();
+        $controller->shouldReceive('ambilApi')->once()->andReturn(['response' => ['order_list' => [[
+            'order_sn' => 'CUSTOM-RESEP', 'buyer_username' => 'Pembeli', 'total_amount' => 100,
+            'shipping_carrier' => 'Kurir', 'message_to_seller' => '', 'create_time' => time(),
+            'item_list' => [[
+                'model_sku' => 'CUSTOM_2', 'item_sku' => '', 'model_quantity_purchased' => 2,
+                'model_discounted_price' => 50, 'item_id' => 110, 'model_id' => 210,
+                'item_name' => 'Custom', 'model_name' => 'Resep',
+            ]],
+        ]]]]);
+        $process = new \ReflectionMethod(BufferController::class, 'prosesBufferShop');
+        $this->assertSame([], $process->invoke($controller, $marketplace, [(object) ['nota' => 'CUSTOM-RESEP', 'status' => 'PROCESSED']]));
+
+        $detail = \App\Models\ProjectMpDetail::where('nota', 'CUSTOM-RESEP')->firstOrFail();
+        $this->assertDatabaseHas('order_custom_bahans', [
+            'sumber' => 'project', 'detail_id' => $detail->id, 'produk_id' => 1, 'jumlah' => 4,
+        ]);
+        $this->assertSame(6, app(\App\Services\StokService::class)->saldoTersedia(1, 1));
+        DB::table('produksis')->insert(['id' => 2, 'nama' => 'Desain', 'grup' => 'Desain']);
+        app(\App\Services\ProduksiStatusService::class)->apply($detail, 2);
+        $this->assertSame(2, app(\App\Services\StokService::class)->saldoTersedia(1, 1));
+        $this->assertDatabaseCount('ambil_barangs', 0);
+    }
+
+    public function test_pengambilan_lama_tidak_dipotong_lagi_saat_status_berubah(): void
+    {
+        DB::table('produksis')->insert(['id' => 2, 'nama' => 'Desain', 'grup' => 'Desain']);
+        app(AmbilBarangService::class)->ambil(['project:1']);
+        $this->assertSame(1, app(\App\Services\StokService::class)->saldoTersedia(1, 1));
+        app(\App\Services\ProduksiStatusService::class)->apply(\App\Models\ProjectMpDetail::find(1), 2);
+        $this->assertSame(1, app(\App\Services\StokService::class)->saldoTersedia(1, 1));
+    }
+
+    public function test_order_offline_memotong_produk_stok_saat_keluar_awal(): void
+    {
+        Schema::table('orders', fn (Blueprint $t) => $t->integer('total')->nullable());
+        Schema::table('order_details', function (Blueprint $t) {
+            $t->integer('hpp')->nullable();
+            $t->text('material_ids')->nullable();
+            $t->timestamp('custom_resep_disalin_at')->nullable();
+        });
+        DB::table('produksis')->insert([
+            ['id' => 2, 'nama' => 'Desain', 'grup' => 'Desain'],
+            ['id' => 3, 'nama' => 'batal', 'grup' => 'batal'],
+        ]);
+
+        $service = app(\App\Services\ProduksiStatusService::class);
+        $service->apply(\App\Models\OrderDetail::find(1), 2);
+        $this->assertSame(2, app(\App\Services\StokService::class)->saldoTersedia(1, 1));
+        $this->assertDatabaseCount('ambil_barangs', 0);
+    }
+
+    public function test_konfirmasi_ambil_barang_manual_dinonaktifkan(): void
+    {
+        Gate::shouldReceive('allows')->once()->with('produk_stok_access')->andReturn(true);
+        $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+        $this->expectExceptionMessage('Pengambilan barang manual telah dinonaktifkan');
+        app(AmbilBarangController::class)->store(Request::create('/admin/ambil-barang', 'POST'), app(AmbilBarangService::class));
     }
 
     public function test_halaman_tidak_menimpa_variabel_cabangs_yang_dipakai_header(): void
