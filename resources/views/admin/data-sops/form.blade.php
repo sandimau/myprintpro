@@ -19,7 +19,7 @@
                     <select id="sop_bagian_id" name="sop_bagian_id" required class="form-select @error('sop_bagian_id') is-invalid @enderror">
                         <option value="">Pilih bagian</option>
                         @foreach ($bagians as $bagian)
-                            <option value="{{ $bagian->id }}" @selected(old('sop_bagian_id', $dataSop->sop_bagian_id) == $bagian->id)>{{ $bagian->nama }}</option>
+                            <option value="{{ $bagian->id }}" @selected(old('sop_bagian_id', $dataSop->sop_bagian_id ?? request('sop_bagian_id')) == $bagian->id)>{{ $bagian->nama }}</option>
                         @endforeach
                     </select>
                     @error('sop_bagian_id') <div class="invalid-feedback">{{ $message }}</div> @enderror

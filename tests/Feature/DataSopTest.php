@@ -82,7 +82,7 @@ class DataSopTest extends TestCase
         $this->assertFalse($sop->fresh()->global);
     }
 
-    public function test_bagian_bisa_dikelola_tanpa_menghapus_bagian_yang_masih_digunakan(): void
+    public function test_bagian_tidak_dihapus_tanpa_konfirmasi_jika_masih_ada_aturan(): void
     {
         Gate::shouldReceive('authorize')->times(3)->with('sop_manage');
         $controller = new DataSopController();
@@ -92,8 +92,57 @@ class DataSopTest extends TestCase
         $this->assertSame('kontrol-kualitas', $bagian->fresh()->slug);
 
         DataSop::create(['judul' => 'Cek hasil', 'isi' => 'Periksa hasil', 'sop_bagian_id' => $bagian->id]);
-        $controller->destroyBagian($bagian);
+        $controller->destroyBagian(Request::create('/admin/data-sops/bagians/'.$bagian->id, 'DELETE'), $bagian);
         $this->assertNotNull($bagian->fresh());
+        $this->assertSame(1, $bagian->sops()->count());
+    }
+
+    public function test_edit_bagian_melalui_popup_kembali_ke_daftar_bagian(): void
+    {
+        Gate::shouldReceive('authorize')->once()->with('sop_manage');
+        $bagian = SopBagian::where('slug', 'setting')->firstOrFail();
+
+        $response = (new DataSopController())->updateBagian(Request::create('/admin/data-sops/bagians/'.$bagian->id, 'PUT', [
+            'nama' => 'Pra Cetak', '_sop_action' => 'edit',
+        ]), $bagian);
+
+        $this->assertSame('Pra Cetak', $bagian->fresh()->nama);
+        $this->assertSame(route('data-sops.index'), $response->getTargetUrl());
+    }
+
+    public function test_hapus_bagian_menghapus_semua_aturan_dengan_cadangan_dan_tidak_mengganggu_bagian_lain(): void
+    {
+        Storage::fake('local');
+        Gate::shouldReceive('authorize')->once()->with('sop_manage');
+        $bagian = SopBagian::where('slug', 'peraturan')->firstOrFail();
+        $lain = SopBagian::where('slug', 'cetak')->firstOrFail();
+        $satu = DataSop::create(['judul' => 'Aturan satu', 'isi' => '<p>Isi satu</p>', 'sop_bagian_id' => $bagian->id]);
+        DataSop::create(['judul' => 'Aturan dua', 'isi' => 'Isi dua', 'sop_bagian_id' => $bagian->id]);
+        DataSop::create(['judul' => 'Aturan lain', 'isi' => 'Tetap ada', 'sop_bagian_id' => $lain->id]);
+
+        (new DataSopController())->destroyBagian(Request::create('/admin/data-sops/bagians/'.$bagian->id, 'DELETE', [
+            'hapus_aturan' => '1',
+        ]), $bagian);
+
+        $this->assertNull($bagian->fresh());
+        $this->assertNull($satu->fresh());
+        $this->assertSame(1, DataSop::count());
+        $backups = Storage::disk('local')->files('sop-backups');
+        $this->assertCount(1, $backups);
+        $this->assertStringContainsString('Aturan satu', Storage::disk('local')->get($backups[0]));
+    }
+
+    public function test_hapus_aturan_satu_satu_tidak_menghapus_bagiannya(): void
+    {
+        Gate::shouldReceive('authorize')->once()->with('sop_manage');
+        $bagian = SopBagian::where('slug', 'setting')->firstOrFail();
+        $sop = DataSop::create(['judul' => 'Aturan satu', 'isi' => 'Isi', 'sop_bagian_id' => $bagian->id]);
+
+        $response = (new DataSopController())->destroy($sop);
+
+        $this->assertNull($sop->fresh());
+        $this->assertNotNull($bagian->fresh());
+        $this->assertSame(route('data-sops.bagian', $bagian->slug), $response->getTargetUrl());
     }
 
     public function test_editor_menampilkan_format_lama_tanpa_menjalankan_html_berbahaya(): void

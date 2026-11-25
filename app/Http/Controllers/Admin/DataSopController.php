@@ -7,7 +7,9 @@ use App\Models\DataSop;
 use App\Models\SopBagian;
 use App\Support\SopHtml;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -58,18 +60,38 @@ class DataSopController extends Controller
         Gate::authorize('sop_manage');
         $sopBagian->update($this->validatedBagian($request, $sopBagian));
 
+        if ($request->input('_sop_action') === 'edit') {
+            return redirect()->route('data-sops.index')->withSuccess('Bagian SOP diperbarui.');
+        }
+
         return redirect()->route('data-sops.bagian', $sopBagian->slug)->withSuccess('Bagian SOP diperbarui.');
     }
 
-    public function destroyBagian(SopBagian $sopBagian)
+    public function destroyBagian(Request $request, SopBagian $sopBagian)
     {
         Gate::authorize('sop_manage');
-        if ($sopBagian->sops()->exists()) {
-            return back()->withErrors(['bagian' => 'Pindahkan semua aturan sebelum menghapus bagian ini.']);
+        if ($sopBagian->sops()->exists() && $request->input('hapus_aturan') !== '1') {
+            return back()->withErrors(['bagian' => 'Konfirmasikan penghapusan seluruh aturan sebelum menghapus bagian.']);
         }
-        $sopBagian->delete();
 
-        return redirect()->route('data-sops.index')->withSuccess('Bagian SOP dihapus.');
+        DB::transaction(function () use ($sopBagian, $request) {
+            $bagian = SopBagian::whereKey($sopBagian->id)->lockForUpdate()->firstOrFail();
+            $aturan = $bagian->sops()->orderBy('id')->get();
+            if ($aturan->isNotEmpty()) {
+                if ($request->input('hapus_aturan') !== '1') {
+                    throw ValidationException::withMessages(['bagian' => 'Konfirmasikan penghapusan seluruh aturan sebelum menghapus bagian.']);
+                }
+                $backup = 'sop-backups/hapus-bagian-' . $bagian->slug . '-' . now()->format('Ymd-His-u') . '.json';
+                $data = json_encode(['bagian' => $bagian->toArray(), 'aturan' => $aturan->toArray()], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+                if (!Storage::disk('local')->put($backup, $data)) {
+                    throw new \RuntimeException('Cadangan SOP tidak dapat disimpan. Penghapusan dibatalkan.');
+                }
+                $bagian->sops()->delete();
+            }
+            $bagian->delete();
+        });
+
+        return redirect()->route('data-sops.index')->withSuccess('Bagian SOP dan seluruh aturannya berhasil dihapus.');
     }
 
     public function show(DataSop $dataSop)
@@ -114,8 +136,9 @@ class DataSopController extends Controller
     public function destroy(DataSop $dataSop)
     {
         Gate::authorize('sop_manage');
+        $bagian = $dataSop->bagian;
         $dataSop->delete();
-        return redirect()->route('data-sops.index')->withSuccess('SOP berhasil dihapus.');
+        return redirect()->route('data-sops.bagian', $bagian->slug)->withSuccess('Aturan SOP berhasil dihapus.');
     }
 
     private function validated(Request $request): array
