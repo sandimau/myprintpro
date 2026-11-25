@@ -16,7 +16,7 @@ class ShopeeStockSyncController extends Controller
 
         // Satu produk dapat terhubung ke banyak listing di beberapa toko. Batch
         // kecil menjaga request cron tetap selesai sebelum timeout HTTP eksternal.
-        $limit = min(max((int) $request->query('limit', 5), 1), 25);
+        $limit = min(max((int) $request->query('limit', 25), 1), 25);
         $marketplaceId = $request->query('marketplace') ? (int) $request->query('marketplace') : null;
 
         $lock = Cache::lock('shopee_stock_sync_cron', 300);

@@ -44,6 +44,10 @@ Route::get('/shopee/bersihkanBuffer', [\App\Http\Controllers\Webhook\BufferContr
 Route::get('/shopee/updateBufferCancel', [\App\Http\Controllers\Webhook\BufferController::class, 'updateBufferCancel'])->name('webhook.shopee.updateBufferCancel');
 Route::get('/shopee/sync-stok', [\App\Http\Controllers\Webhook\ShopeeStockSyncController::class, 'sync'])->name('webhook.shopee.syncStok');
 Route::get('/shopee/finish-shipped', [\App\Http\Controllers\Webhook\BufferController::class, 'completeShippedOrders'])->name('webhook.shopee.finishShipped');
+Route::get('/shopee/cek-nota-terlewat', \App\Http\Controllers\Webhook\ShopeeMissingBufferController::class)
+    ->middleware('auth')->name('webhook.shopee.cekNotaTerlewat');
+Route::get('/buffer/sku-tidak-ada', \App\Http\Controllers\Webhook\ShopeeBufferSkuController::class)
+    ->middleware('auth')->name('buffer.skuTidakAda');
 
 // Buffer Controller Routes
 Route::prefix('buffer')->name('buffer.')->group(function () {
@@ -105,6 +109,19 @@ Route::group(['namespace' => 'App\Http\Controllers'], function()
         Route::group(['prefix' => 'admin', 'namespace' => 'Admin'], function () {
             // Dashboard
             Route::get('/dashboard', 'DashboardController@index')->name('dashboard');
+
+            Route::post('data-sops/bagians', 'DataSopController@storeBagian')
+                ->middleware('can:sop_manage')->name('data-sops.bagian.store');
+            Route::get('data-sops/bagians/{sopBagian}/edit', 'DataSopController@editBagian')
+                ->middleware('can:sop_manage')->name('data-sops.bagian.edit');
+            Route::put('data-sops/bagians/{sopBagian}', 'DataSopController@updateBagian')
+                ->middleware('can:sop_manage')->name('data-sops.bagian.update');
+            Route::delete('data-sops/bagians/{sopBagian}', 'DataSopController@destroyBagian')
+                ->middleware('can:sop_manage')->name('data-sops.bagian.destroy');
+            Route::get('data-sops/bagian/{sopBagian:slug}', 'DataSopController@bagian')
+                ->middleware('can:sop_access')->name('data-sops.bagian');
+            Route::resource('data-sops', 'DataSopController')
+                ->middleware('can:sop_access');
 
             // Referensi HPP dari lembar perhitungan bahan dan ID card.
             Route::get('/hpp', 'HppReferensiController@index')->middleware('can:hpp_access')->name('hpp.index');

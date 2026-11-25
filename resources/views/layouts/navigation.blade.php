@@ -29,7 +29,7 @@
     $activeAnalisaStok = request()->is('admin/analisa/stok*');
 
     $openProduksiOrder = $activeOrderProses || $activeOrderProsesOnline || $activeOrderArsip || $activeOrderOnline;
-    $openData = $navOpen('admin/kontaks*');
+    $openData = $navOpen('admin/kontaks*', 'admin/data-sops*');
     $openKeuangan =
         $navOpen('admin/akunKategoris*', 'admin/akunDetails*', 'admin/belanja*', 'admin/hutang*', 'admin/kas', 'admin/pembayaran*', 'admin/aset-tetap*') ||
         $activeBelumLunas;
@@ -83,7 +83,7 @@
     $canSetupDesain = $user->can('desain_setup_access');
     $isStockBahan = $user->hasRole('stock_bahan');
     $showProduksiOrder = $user->can('order_access');
-    $showData = $user->can('kontak_access');
+    $showData = $user->can('kontak_access') || $user->can('sop_access');
     $showKeuangan =
         $user->can('akun_detail_access') ||
         $user->can('keuangan') ||
@@ -346,6 +346,15 @@
                                 <use xlink:href="{{ asset('icons/coreui.svg#cil-user') }}"></use>
                             </svg>
                             {{ __('Kontak') }}
+                        </a>
+                    </li>
+                @endcan
+                @can('sop_access')
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('data-sops.*') ? 'active' : '' }}"
+                            href="{{ route('data-sops.index') }}">
+                            <svg class="nav-icon"><use xlink:href="{{ asset('icons/coreui.svg#cil-notes') }}"></use></svg>
+                            Data SOP
                         </a>
                     </li>
                 @endcan

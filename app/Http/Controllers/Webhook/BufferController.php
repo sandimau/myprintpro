@@ -22,6 +22,7 @@ use App\Http\Controllers\Traits\MarketplaceTriger;
 use App\Services\ProduksiStatusService;
 use App\Support\CabangContext;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class BufferController extends Controller
 {
@@ -351,6 +352,7 @@ class BufferController extends Controller
 
     public function prosesBuffer()
     {
+        $errors = [];
         $ambil = MarketplaceBuffer::where('mp', 'shopee')
             ->whereNull('project_id')
             ->orderBy('shop_id')
@@ -363,8 +365,8 @@ class BufferController extends Controller
             $marketplace = $this->marketplaceByShopId($shop_id);
 
             if ($marketplace) {
-                with_cabang($marketplace->cabang_id, function () use ($marketplace, $mp, $shop_id) {
-                    $this->prosesBufferShop($marketplace, $mp);
+                with_cabang($marketplace->cabang_id, function () use ($marketplace, $mp, &$errors) {
+                    $errors = array_merge($errors, $this->prosesBufferShop($marketplace, $mp));
                 });
             }
         }
@@ -376,10 +378,17 @@ class BufferController extends Controller
 
         /////////////3. memproses yg cancel
         $this->hapusCancelShopee();
+
+        return response()->json([
+            'success' => empty($errors),
+            'message' => empty($errors) ? 'Buffer berhasil diproses.' : 'Sebagian nota gagal; buffer lainnya tetap diproses.',
+            'errors' => $errors,
+        ]);
     }
 
-    private function prosesBufferShop($marketplace, $mp)
+    private function prosesBufferShop($marketplace, $mp): array
     {
+                $errors = [];
                 $nota = [];
                 $i = 0;
                 foreach ($mp as $push) {
@@ -394,7 +403,7 @@ class BufferController extends Controller
                 }
 
                 if (empty($nota)) {
-                    return;
+                    return $errors;
                 }
 
                 $param = [
@@ -412,13 +421,20 @@ class BufferController extends Controller
 
                         $nota = $orderlist['order_sn'];
 
+                        try {
                         DB::transaction(function () use ($nota, $orderlist, $marketplace, $keterangan) {
-                            $existingProject = ProjectMp::where('nota', $nota)->lockForUpdate()->first();
+                            // Serialisasi proses per toko: lock pada nota yang belum ada tidak
+                            // mencegah dua request bersamaan membuat project yang sama.
+                            DB::table('marketplaces')->where('id', $marketplace->id)->lockForUpdate()->first();
+
+                            // Nota unik secara global, jadi pencarian juga harus lintas cabang.
+                            $existingProject = ProjectMp::withoutGlobalScope('cabang')
+                                ->where('nota', $nota)->first();
 
                             if ($existingProject) {
                                 MarketplaceBuffer::where('mp', 'shopee')->where('nota', $nota)->update([
                                     'project_id' => $existingProject->id,
-                                    'marketplace_id' => $marketplace->id,
+                                    'marketplace_id' => $existingProject->marketplace_id ?: $marketplace->id,
                                 ]);
 
                                 return;
@@ -453,7 +469,7 @@ class BufferController extends Controller
 
                                 if ($sku != 'NON_PRODUK') {
                                     $itemCustom = str_starts_with((string) $sku, 'CUSTOM_');
-                                    $parsed = app(\App\Services\ProdukCustomService::class)->parseSku((string) $sku);
+                                    $parsed = $this->parseShopeeSku((string) $sku, $nota);
                                     $materialIds = $parsed['material_ids'];
                                     $sku = $parsed['produk_id'];
                                     $paket = $parsed['paket'];
@@ -547,10 +563,29 @@ class BufferController extends Controller
                                 'marketplace_id' => $marketplace->id
                             ]);
                         });
+                        } catch (ValidationException $e) {
+                            $message = $e->errors()['produk_id'][0] ?? $e->getMessage();
+                            $errors[] = ['nota' => $nota, 'shop_id' => $marketplace->shop_id, 'message' => $message];
+                            $this->logError($marketplace, 'proses buffer SKU', $message);
+                        }
                     }
                 } else {
                     $this->logError($marketplace, 'proses buffer', $api);
                 }
+                return $errors;
+    }
+
+    private function parseShopeeSku(string $sku, string $nota): array
+    {
+        try {
+            return app(\App\Services\ProdukCustomService::class)->parseSku($sku);
+        } catch (ValidationException $e) {
+            $errors = [];
+            foreach ($e->errors() as $field => $messages) {
+                $errors[$field] = array_map(fn ($message) => "Pesanan Shopee {$nota}: {$message}", $messages);
+            }
+            throw ValidationException::withMessages($errors);
+        }
     }
 
     public function hapusCancelShopee()

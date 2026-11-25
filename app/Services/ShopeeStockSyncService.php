@@ -62,7 +62,7 @@ class ShopeeStockSyncService
     /**
      * @return array{success: bool, synced: int, failed: int, skipped: int, errors: array<int, string>}
      */
-    public function processDirtyProducts(int $limit = 5, ?int $marketplaceId = null): array
+    public function processDirtyProducts(int $limit = 25, ?int $marketplaceId = null): array
     {
         $dirtyRows = ShopeeStockSync::whereNotNull('dirty_at')
             ->orderBy('dirty_at')

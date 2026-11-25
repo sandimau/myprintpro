@@ -570,6 +570,40 @@
             --pmp-text: #212529;
         }
 
+        :root:not([data-theme="light"]) .projectmp-detail-page,
+        [data-theme="dark"] .projectmp-detail-page {
+            --pmp-border: var(--app-border);
+            --pmp-muted: var(--app-text-muted);
+            --pmp-surface: var(--app-bg);
+            --pmp-text: var(--app-text);
+            --pmp-emphasis-bg: #243653;
+            --pmp-emphasis-border: #3b5990;
+            --pmp-warn-bg: #3b3025;
+            --pmp-warn-border: #78532a;
+            --pmp-table-heading: #273449;
+            --pmp-table-heading-text: var(--app-text-muted);
+            --pmp-table-hover: #273449;
+            --pmp-chat-bg: #273449;
+        }
+
+        :root:not([data-theme="light"]) .projectmp-detail-page .card-header.bg-white,
+        [data-theme="dark"] .projectmp-detail-page .card-header.bg-white {
+            background-color: var(--app-surface) !important;
+            color: var(--app-text);
+        }
+
+        :root:not([data-theme="light"]) .projectmp-detail-page .text-secondary,
+        [data-theme="dark"] .projectmp-detail-page .text-secondary {
+            color: var(--app-text-muted) !important;
+        }
+
+        :root:not([data-theme="light"]) .projectmp-detail-page .text-bg-light,
+        [data-theme="dark"] .projectmp-detail-page .text-bg-light {
+            background-color: var(--app-bg) !important;
+            color: var(--app-text) !important;
+            border-color: var(--app-border) !important;
+        }
+
         .projectmp-detail-card {
             border-radius: 12px;
             overflow: hidden;
@@ -632,13 +666,13 @@
         }
 
         .projectmp-summary-item.is-emphasis {
-            background: #eef5ff;
-            border-color: #cfe0ff;
+            background: var(--pmp-emphasis-bg, #eef5ff);
+            border-color: var(--pmp-emphasis-border, #cfe0ff);
         }
 
         .projectmp-summary-item.is-warn {
-            background: #fff6e8;
-            border-color: #f0d5a8;
+            background: var(--pmp-warn-bg, #fff6e8);
+            border-color: var(--pmp-warn-border, #f0d5a8);
         }
 
         .projectmp-keterangan {
@@ -659,8 +693,8 @@
         }
 
         .projectmp-table thead th {
-            background: #f1f3f5;
-            color: #495057;
+            background: var(--pmp-table-heading, #f1f3f5);
+            color: var(--pmp-table-heading-text, #495057);
             font-size: 0.75rem;
             text-transform: uppercase;
             letter-spacing: 0.03em;
@@ -673,11 +707,11 @@
         .projectmp-table tbody td {
             padding: 0.75rem;
             vertical-align: middle;
-            border-color: #edf0f2;
+            border-color: var(--pmp-border);
         }
 
         .projectmp-table tbody tr:hover {
-            background: #fafbfc;
+            background: var(--pmp-table-hover, #fafbfc);
         }
 
         .projectmp-produk-cell {
@@ -748,7 +782,7 @@
         }
 
         .projectmp-chat-bubble {
-            background: #f1f3f5;
+            background: var(--pmp-chat-bg, #f1f3f5);
             border-radius: 10px;
             padding: 0.7rem 0.9rem;
             line-height: 1.45;

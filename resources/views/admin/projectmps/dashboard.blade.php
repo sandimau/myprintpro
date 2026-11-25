@@ -422,6 +422,17 @@
     <style>
         @include('admin.projectmps.partials.detail-projectmp-modal-styles')
 
+        .order-dashboard-shell {
+            --projectmp-card-bg: #fff;
+            --projectmp-product-text: #636363;
+        }
+
+        :root:not([data-theme="light"]) .order-dashboard-shell,
+        [data-theme="dark"] .order-dashboard-shell {
+            --projectmp-card-bg: var(--app-surface);
+            --projectmp-product-text: var(--app-text-muted);
+        }
+
         .dashboard-page-header {
             display: flex;
             flex-wrap: wrap;
@@ -510,7 +521,7 @@
             margin-bottom: 0;
             border-radius: 8px;
             border: 1px solid var(--app-border, #dee2e6);
-            background: var(--app-card-bg, #fff);
+            background: var(--projectmp-card-bg);
         }
 
         .mp-item:last-child .order-card {
@@ -577,7 +588,7 @@
 
         .order-product-name {
             flex: 1 1 100%;
-            color: #636363;
+            color: var(--projectmp-product-text);
             word-break: break-word;
             line-height: 1.4;
         }

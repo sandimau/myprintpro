@@ -64,3 +64,29 @@ If you discover a security vulnerability within Laravel, please send an e-mail t
 ## License
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+# Data SOP
+
+Halaman SOP tersedia di `/admin/data-sops` untuk pengguna yang memiliki izin `sop_access`.
+Izin `sop_manage` diberikan kepada role super, admin, dan manager untuk menambah,
+mengubah, serta menghapus SOP. Setelah menyiapkan database MySQL, jalankan:
+
+```bash
+php artisan migrate
+php artisan sop:import
+```
+
+Perintah impor membaca `database/seeders/data_sops.sql` (atau path file lain yang
+diberikan sebagai argumen). Impor hanya menyisipkan ID yang belum ada; data SOP
+yang telah diedit tidak ditimpa. Kolom lama `company_id` dan `kategori_id` diabaikan.
+Bagian SOP disimpan di tabel `sop_bagians` dan dapat dikelola di halaman Data SOP.
+Impor otomatis merapikan judul berulang dan format isi pada bagian yang sama.
+Untuk merapikan ulang data, jalankan `php artisan sop:rapikan`. Sebelum perubahan,
+cadangan JSON disimpan di `storage/app/sop-backups/`.
+
+Untuk deploy melalui phpMyAdmin, impor `database/sql/data_sops_phpmyadmin.sql` ke
+database proyek yang sudah memiliki tabel role/permission dan migrations.
+File ini berisi struktur dua tabel SOP, 248 data SOP, 12 bagian, hak akses dan
+catatan migrasinya; impor ulang tidak menimpa data SOP yang sudah ada. Jika
+database tujuan masih punya tabel `data_sops` berstruktur lama, jalankan
+migrasi Laravel terlebih dahulu. File ekspor dapat diperbarui setelah mengedit
+data lokal dengan `php artisan sop:export-sql`.
