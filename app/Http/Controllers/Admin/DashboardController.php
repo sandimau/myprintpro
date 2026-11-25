@@ -4,12 +4,13 @@ namespace App\Http\Controllers\Admin;
 
 use App\Models\Order;
 use App\Models\Marketplace;
+use App\Services\PengingatGajian;
 use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Controller;
 
 class DashboardController extends Controller
 {
-    public function index()
+    public function index(PengingatGajian $pengingatGajian)
     {
         $data = [];
 
@@ -28,6 +29,10 @@ class DashboardController extends Controller
         $data['produkTerlaris'] = $this->getProdukTerlarisPekanan();
         $data['orderTerbesarHariIni'] = $this->getOrderTerbesarHariIni();
         $data['marketplaces'] = Marketplace::pluck('nama', 'id');
+        $data['tampilkanPengingatGajian'] = user_has_role_insensitive('super', 'keuangan');
+        $data['anggotaGajianHariIni'] = $data['tampilkanPengingatGajian']
+            ? $pengingatGajian->hariIni()
+            : collect();
 
         return view('admin.dashboard.index', $data);
     }

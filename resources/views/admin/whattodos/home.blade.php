@@ -61,11 +61,6 @@
                                         </div>
                                     </td>
                                 </tr>
-                            @elseif (auth()->user()->can('keuangan') && $what->nama === 'gajian')
-                                <tr data-entry-id="{{ $what->id }}">
-                                    <td>{{ $what->isi }}</td>
-                                    <td></td>
-                                </tr>
                             @endif
                         @endforeach
 

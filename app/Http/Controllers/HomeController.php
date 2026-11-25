@@ -29,26 +29,6 @@ class HomeController extends Controller
      */
     public function index(Request $request)
     {
-        $gajiRecord = Whattodo::where('nama', 'gaji')->first();
-        if ($gajiRecord) {
-            $lastDay = (int) $gajiRecord->isi;
-            $today = (int) date('j');
-
-            if ($lastDay !== $today) {
-                foreach ($this->getMissedGajianDays($lastDay, $today) as $day) {
-                    foreach ($this->getMembersByGajianDay($day) as $row) {
-                        $dayLabel = str_pad($day, 2, '0', STR_PAD_LEFT);
-                        Whattodo::create([
-                            'isi' => $row->nama_lengkap . ' gajian tanggal ' . $dayLabel,
-                            'nama' => 'gajian',
-                        ]);
-                    }
-                }
-
-                $gajiRecord->update(['isi' => date('d')]);
-            }
-        }
-
         $member = Member::where('user_id', auth()->id())->first();
         if ($member) {
             $whatMember = Whattodo::where('member_id', $member->id)
@@ -56,7 +36,7 @@ class HomeController extends Controller
                 ->get();
         }
 
-        $whattodos = Whattodo::where('nama','!=','gaji')->get();
+        $whattodos = Whattodo::where('nama', 'tugas')->get();
         $sistems = Sistem::get()->pluck('isi', 'nama');
         $whatMember = $whatMember ?? collect(); // Initialize if not set
         return view('admin.whattodos.home', compact('whattodos', 'whatMember'));
@@ -123,32 +103,5 @@ class HomeController extends Controller
     {
         $tafio = new DeleteOrders;
         $tafio->deleteOrders();
-    }
-
-    private function getMissedGajianDays(int $lastDay, int $today): array
-    {
-        if ($today > $lastDay) {
-            return range($lastDay + 1, $today);
-        }
-
-        $daysInPrevMonth = (int) date('t', strtotime('last day of previous month'));
-        $days = $lastDay < $daysInPrevMonth
-            ? range($lastDay + 1, $daysInPrevMonth)
-            : [];
-
-        return array_merge($days, range(1, $today));
-    }
-
-    private function getMembersByGajianDay(int $day)
-    {
-        $dayPadded = str_pad($day, 2, '0', STR_PAD_LEFT);
-
-        return Member::where('status', 1)
-            ->where(function ($query) use ($day, $dayPadded) {
-                $query->where('tgl_gajian', (string) $day)
-                    ->orWhere('tgl_gajian', $dayPadded)
-                    ->orWhereRaw('DAY(tgl_gajian) = ?', [$day]);
-            })
-            ->get();
     }
 }
